@@ -64,31 +64,34 @@ Authoring checklist:
 
 ## Results
 
-These numbers come from the checked-in `report.md`: random ran 30 episodes
-across the tier-1 pack; Claude ran 3 tier-1 episodes before `--max-cost-usd
-0.10` stopped launching new work. Tier-2 tasks use multiple hidden tests and
-fractional reward, so their mean reward tables are gradients, not directly
-comparable with the older pass/fail-only numbers.
+Tier 1 saturates at pass@1 `1.0`; tier 2 does not. The current tier-2 numbers
+below use only the post-tightening sweep artifacts in `runs/sweep-claude-v2/`
+and `runs/sweep-random-v2/`. Tier-2 tasks use multiple hidden tests and
+fractional reward, so mean reward is a gradient rather than a pass/fail-only
+score.
 
-| Policy | Episodes | pass@1 | pass@3 | Mean Reward | Mean Steps | Cost |
-|---|---:|---:|---:|---:|---:|---:|
-| random | 30 | 0.000 | 0.000 | 0.000 | 5.23 | $0.000000 |
-| claude | 3 | 1.000 | 1.000 | 1.000 | 7.00 | $0.170124 |
-
-Tier 1 saturates: the available Claude tier-1 run has pass@1 `1.000`. Tier 2
-does not: the full tier-2 Claude sweep in `runs/sweep-claude/sweep.json`
-reaches pass@1 `0.800` at `max_steps=25`.
-
-Stage-6 tier-2 step-budget curve:
+Claude tier-2 sweep. Source: `runs/sweep-claude-v2/`.
 
 | Max Steps | pass@1 | Mean Reward |
 |---:|---:|---:|
-| 3 | 0.000 | 0.133 |
+| 3 | 0.000 | 0.000 |
 | 5 | 0.600 | 0.600 |
 | 25 | 0.800 | 0.933 |
 
-The jump from 3 to 5 steps is the first point where agents have enough room to
-inspect, edit, and run visible tests on several tier-2 tasks.
+The transition from 3 to 5 steps is the first point where Claude solves any
+tier-2 tasks: pass@1 moves from `0.000` to `0.600`.
+
+Random tier-2 sweep. Source: `runs/sweep-random-v2/`.
+
+| Max Steps | pass@1 | Mean Reward |
+|---:|---:|---:|
+| 3 | 0.000 | 0.000 |
+| 5 | 0.000 | 0.000 |
+| 25 | 0.000 | 0.000 |
+
+The random baseline now reads `0.000` at every budget. It previously read
+`0.133` because a task granted partial credit on the pristine workspace; that
+older tier-2 sweep is stale and is not cited here.
 
 Example artifacts are committed under `examples/`:
 
@@ -106,8 +109,8 @@ TaskForge assumes agents will try weird things, so the environment is defensive:
   initial workspace.
 - Observations use the stable placeholder `/workspace`; host temp paths are kept
   internal and are not written to trajectories.
-- Failure analysis tracks `attempted_test_edit`; the current report observed 0
-  test-edit attempts.
+- Failure analysis tracks `attempted_test_edit` so reports can surface test-edit
+  attempts when trajectories contain them.
 
 ## Quickstart
 
@@ -212,19 +215,20 @@ filesystem.
 
 ## What The Benchmark Does Not Measure
 
-The current tier-2 sweep does not prove robust decimal reasoning. The unsolved
-`max_steps=25` task is `chain-of-three`: Claude changed cents conversion to
+The current tier-2 sweep in `runs/sweep-claude-v2/` does not prove robust
+decimal reasoning. The only unsolved `max_steps=25` task is `chain-of-three`:
+Claude changed cents conversion to
 `round(float(price) * 100)`, earning terminal reward `0.6666666666666666`, but
 failed `tests/test_grading.py::test_rounds_half_cent_up_before_discount`
 because the task requires decimal half-up rounding for values such as `1.005`.
+It passed the other two hidden tests:
+`tests/test_grading.py::test_rounds_each_unit_before_multiplying` and
+`tests/test_grading.py::test_discount_uses_rounded_subtotal`.
 
-The original random tier-2 sweep exposed a signal weakness in `perf-regression`:
-the pristine workspace passed
-`tests/test_grading.py::test_preserves_left_order_and_deduplicates` and
-`tests/test_grading.py::test_requires_active_on_both_sides`, so it received
-reward `0.6666666666666666` before the actual performance fix. Those hidden
-tests now include the same runtime pressure as the performance case; current
-verification reports pristine reward `0.000` for `perf-regression`.
+The random baseline section documents a previous signal weakness in
+`perf-regression`: before the hidden tests were tightened, a stale tier-2 sweep
+read `0.133` mean reward because the pristine workspace received partial
+credit. The v2 random sweep now reports `0.000` at every budget.
 
 ## Limitations
 

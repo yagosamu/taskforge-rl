@@ -52,6 +52,7 @@ class LimitsSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     max_observation_chars: int = Field(default=4000, ge=1)
+    max_steps: int | None = Field(default=None, ge=1)
 
 
 class TaskSpec(BaseModel):

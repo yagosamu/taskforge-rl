@@ -4,10 +4,31 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from taskforge.actions import Action, ListFiles
+from taskforge.env import Observation
 from taskforge.evaluate import read_report, run_eval
-from taskforge.loader import discover_tasks
+from taskforge.loader import discover_tasks, load_task
+from taskforge.policies.base import PolicyStats
 from taskforge.policies.scripted import ScriptedPolicy
 from taskforge.runners import SubprocessRunner
+
+
+class NeverFinishPolicy:
+    """Policy that waits for the environment step limit."""
+
+    name = "never_finish"
+
+    def reset(self) -> None:
+        """Reset policy state."""
+
+    def act(self, obs: Observation) -> Action:
+        """Keep taking intermediate actions until the environment terminates."""
+        del obs
+        return ListFiles(path=".")
+
+    def stats(self) -> PolicyStats:
+        """Return zero-cost policy stats."""
+        return PolicyStats()
 
 
 def test_run_eval_scripted_policy_writes_report(tmp_path: Path) -> None:
@@ -85,3 +106,87 @@ def test_verbose_trajectory_writes_one_side_file_per_parallel_episode(tmp_path: 
     assert len(side_files) == 2
     assert side_trajectories == trajectory_paths
     assert all(side_file.read_text(encoding="utf-8").strip() for side_file in side_files)
+
+
+def test_run_eval_uses_task_limits_max_steps_over_budget_default(tmp_path: Path) -> None:
+    """Eval uses the task's declared step budget, not a hardcoded default."""
+    task_dir = tmp_path / "limit-task"
+    (task_dir / "workspace").mkdir(parents=True)
+    (task_dir / "tests").mkdir()
+    (task_dir / "workspace" / "client.py").write_text("", encoding="utf-8")
+    (task_dir / "tests" / "test_hidden.py").write_text(
+        "def test_hidden() -> None:\n    assert True\n",
+        encoding="utf-8",
+    )
+    (task_dir / "task.yaml").write_text(
+        """
+id: limit-task
+title: Limit Task
+workspace: workspace
+tests:
+  visible: []
+  hidden:
+    - tests/test_hidden.py
+reward:
+  type: test_pass_ratio
+budget:
+  max_steps: 3
+limits:
+  max_steps: 5
+""",
+        encoding="utf-8",
+    )
+    task = load_task(task_dir)
+
+    report = run_eval(
+        [task],
+        lambda seed: NeverFinishPolicy(),
+        n_samples=1,
+        max_workers=1,
+        runner_factory=SubprocessRunner,
+        out_dir=tmp_path / "eval",
+    )
+
+    assert report.results[0].done_reason == "step_limit"
+    assert report.results[0].steps == 5
+
+
+def test_run_eval_max_steps_override_is_explicit(tmp_path: Path) -> None:
+    """An explicit max_steps override wins over the task value."""
+    task_dir = tmp_path / "override-task"
+    (task_dir / "workspace").mkdir(parents=True)
+    (task_dir / "tests").mkdir()
+    (task_dir / "tests" / "test_hidden.py").write_text(
+        "def test_hidden() -> None:\n    assert True\n",
+        encoding="utf-8",
+    )
+    (task_dir / "task.yaml").write_text(
+        """
+id: override-task
+title: Override Task
+workspace: workspace
+tests:
+  visible: []
+  hidden:
+    - tests/test_hidden.py
+reward:
+  type: test_pass_ratio
+limits:
+  max_steps: 5
+""",
+        encoding="utf-8",
+    )
+    task = load_task(task_dir)
+
+    report = run_eval(
+        [task],
+        lambda seed: NeverFinishPolicy(),
+        n_samples=1,
+        max_workers=1,
+        runner_factory=SubprocessRunner,
+        out_dir=tmp_path / "eval-override",
+        max_steps=2,
+    )
+
+    assert report.results[0].done_reason == "step_limit"
+    assert report.results[0].steps == 2

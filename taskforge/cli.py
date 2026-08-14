@@ -50,6 +50,7 @@ def run(
     runner_name: str = typer.Option("subprocess", "--runner"),
     trajectory: Annotated[Path | None, typer.Option("--trajectory")] = None,
     verbose_trajectory: Annotated[bool, typer.Option("--verbose-trajectory")] = False,
+    max_steps: Annotated[int | None, typer.Option("--max-steps")] = None,
 ) -> None:
     """Run a task with a hardcoded policy and print the reward breakdown."""
     if policy != "scripted":
@@ -61,6 +62,7 @@ def run(
         runner=runner,
         trajectory_path=trajectory,
         verbose_trajectory=verbose_trajectory,
+        max_steps=max_steps,
     ) as env:
         env.reset()
         env.step(RunTests())
@@ -116,6 +118,7 @@ def eval(
     runner_name: Annotated[str, typer.Option("--runner")] = "subprocess",
     out_dir: Annotated[Path | None, typer.Option("--out")] = None,
     verbose_trajectory: Annotated[bool, typer.Option("--verbose-trajectory")] = False,
+    max_steps: Annotated[int | None, typer.Option("--max-steps")] = None,
     yes: Annotated[bool, typer.Option("--yes")] = False,
     max_cost_usd: Annotated[float | None, typer.Option("--max-cost-usd")] = None,
 ) -> None:
@@ -139,6 +142,7 @@ def eval(
         out_dir=output,
         max_cost_usd=max_cost_usd,
         verbose_trajectory=verbose_trajectory,
+        max_steps=max_steps,
     )
     typer.echo(report_table(report))
 

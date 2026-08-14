@@ -54,6 +54,7 @@ class TaskEnv:
         event_log_path: Path | None = None,
         trajectory_path: Path | None = None,
         verbose_trajectory: bool = False,
+        max_steps: int | None = None,
     ) -> None:
         """Create an environment for one task."""
         self.task = task
@@ -61,6 +62,7 @@ class TaskEnv:
         self.event_log_path = event_log_path
         self.trajectory_path = trajectory_path
         self.verbose_trajectory = verbose_trajectory
+        self.max_steps_override = max_steps
         self._workspace_cm: object | None = None
         self._logger_cm: object | None = None
         self._logger: EventLogger | None = None
@@ -146,7 +148,7 @@ class TaskEnv:
             info["error"] = str(exc)
             self._finish("error")
 
-        if self.step_count >= self.task.budget.max_steps:
+        if self.step_count >= self._max_steps():
             self._finish("step_limit")
         if time.monotonic() - self._started_at >= self.task.budget.episode_timeout_s:
             self._finish("timeout")
@@ -238,10 +240,17 @@ class TaskEnv:
             task_id=task_id,
             workspace=Path(workspace),
             step=self.step_count,
-            remaining_steps=max(self.task.budget.max_steps - self.step_count, 0),
+            remaining_steps=max(self._max_steps() - self.step_count, 0),
             last_output=output,
             truncated=truncated_task or truncated_workspace or truncated_output,
         )
+
+    def _max_steps(self) -> int:
+        if self.max_steps_override is not None:
+            return self.max_steps_override
+        if self.task.limits.max_steps is not None:
+            return self.task.limits.max_steps
+        return self.task.budget.max_steps
 
     def _finish(self, done_reason: str) -> None:
         if not self.done:

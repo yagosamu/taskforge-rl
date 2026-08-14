@@ -37,10 +37,16 @@ budget:
   max_steps: 3
   step_timeout_s: 5
   test_timeout_s: 10
+limits:
+  max_observation_chars: 4000
+  max_steps: 25
 ```
 
 Validation checks that referenced files exist, visible and hidden test lists do
 not overlap, the workspace directory exists, and `reward.type` is registered.
+The effective step budget is `--max-steps` when explicitly passed, then
+`limits.max_steps` when declared by the task, then the older `budget.max_steps`
+field for compatibility with Stage 1 task files.
 
 At runtime, TaskForge copies the workspace and tests into a temporary directory.
 Hidden tests are restored from the original task definition immediately before
@@ -197,8 +203,11 @@ taskforge eval \
   --max-workers 4 \
   --runner subprocess \
   --out runs/eval-scripted/ \
-  --verbose-trajectory
+  --verbose-trajectory \
+  --max-steps 25
 ```
+
+Omit `--max-steps` to use each task's own configured step budget.
 
 Use Claude:
 

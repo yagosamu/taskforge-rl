@@ -25,6 +25,7 @@ def run_episode(
     *,
     trajectory_path: Path | None = None,
     verbose_trajectory: bool = False,
+    max_steps: int | None = None,
 ) -> EpisodeResult:
     """Run one task episode and return a structured result."""
     policy.reset()
@@ -33,6 +34,7 @@ def run_episode(
         runner=runner,
         trajectory_path=trajectory_path,
         verbose_trajectory=verbose_trajectory,
+        max_steps=max_steps,
     ) as env:
         obs = env.reset()
         result = None
@@ -76,6 +78,7 @@ def run_eval(
     out_dir: Path,
     max_cost_usd: float | None = None,
     verbose_trajectory: bool = False,
+    max_steps: int | None = None,
 ) -> EvalReport:
     """Run policy evaluation episodes in parallel with bounded workers."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -107,6 +110,7 @@ def run_eval(
                     seed,
                     trajectory_path=trajectory,
                     verbose_trajectory=verbose_trajectory,
+                    max_steps=max_steps,
                 )
                 futures[future] = (task, seed, trajectory)
                 next_job += 1

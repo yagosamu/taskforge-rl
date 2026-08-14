@@ -1,0 +1,18 @@
+id: fix-retry-backoff
+title: Fix retry final exception propagation
+description: >
+  The retry helper should return successful attempts, but when all attempts fail it
+  must re-raise the final exception instead of returning None.
+workspace: workspace
+tests:
+  visible:
+    - tests/test_basic.py
+  hidden:
+    - tests/test_grading.py
+reward:
+  type: test_pass_ratio
+  partial_credit: false
+budget:
+  max_steps: 3
+  step_timeout_s: 5
+  test_timeout_s: 10

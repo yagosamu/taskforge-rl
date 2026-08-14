@@ -60,3 +60,28 @@ def test_parallel_eval_matches_serial_results(tmp_path: Path) -> None:
         for result in parallel.results
     ]
     assert parallel_outcomes == serial_outcomes
+
+
+def test_verbose_trajectory_writes_one_side_file_per_parallel_episode(tmp_path: Path) -> None:
+    """Verbose parallel eval writes full observations beside each trajectory."""
+    tasks = discover_tasks(Path("tasks"))
+    report = run_eval(
+        tasks,
+        lambda seed: ScriptedPolicy(),
+        n_samples=2,
+        max_workers=2,
+        runner_factory=SubprocessRunner,
+        out_dir=tmp_path,
+        verbose_trajectory=True,
+    )
+
+    side_files = sorted(tmp_path.glob("*.jsonl.observations.jsonl"))
+    trajectory_paths = {Path(result.trajectory_path or "") for result in report.results}
+    side_trajectories = {
+        side_file.with_name(side_file.name.removesuffix(".observations.jsonl"))
+        for side_file in side_files
+    }
+
+    assert len(side_files) == 2
+    assert side_trajectories == trajectory_paths
+    assert all(side_file.read_text(encoding="utf-8").strip() for side_file in side_files)

@@ -196,7 +196,8 @@ taskforge eval \
   --n 3 \
   --max-workers 4 \
   --runner subprocess \
-  --out runs/eval-scripted/
+  --out runs/eval-scripted/ \
+  --verbose-trajectory
 ```
 
 Use Claude:
@@ -222,7 +223,10 @@ file. A failing episode is captured as `done_reason="error"` and does not abort
 the rest of the run.
 
 The output directory contains `report.json` and one trajectory JSONL per
-episode. Render a saved report with:
+episode. With `--verbose-trajectory`, each episode also writes its full
+observations to a side file next to its trajectory, for example
+`fix-retry-backoff-0.jsonl.observations.jsonl`. Parallel runs use one side file
+per episode and do not share observation handles. Render a saved report with:
 
 ```bash
 taskforge report runs/eval-scripted/

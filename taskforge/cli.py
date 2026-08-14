@@ -115,6 +115,7 @@ def eval(
     max_workers: Annotated[int, typer.Option("--max-workers")] = 4,
     runner_name: Annotated[str, typer.Option("--runner")] = "subprocess",
     out_dir: Annotated[Path | None, typer.Option("--out")] = None,
+    verbose_trajectory: Annotated[bool, typer.Option("--verbose-trajectory")] = False,
     yes: Annotated[bool, typer.Option("--yes")] = False,
     max_cost_usd: Annotated[float | None, typer.Option("--max-cost-usd")] = None,
 ) -> None:
@@ -137,6 +138,7 @@ def eval(
         runner_factory=lambda: _runner(runner_name),
         out_dir=output,
         max_cost_usd=max_cost_usd,
+        verbose_trajectory=verbose_trajectory,
     )
     typer.echo(report_table(report))
 

@@ -17,6 +17,13 @@
 | medium | claude | 2 | 1.000 | 1.000 |
 | medium | random | 9 | 0.000 | 0.000 |
 
+## By Tier
+
+| Tier | Policy | Episodes | Mean Reward | pass@1 |
+|---|---|---:|---:|---:|
+| 1 | claude | 3 | 1.000 | 1.000 |
+| 1 | random | 30 | 0.000 | 0.000 |
+
 ## By Tag
 
 | Tag | Policy | Episodes | Mean Reward |
@@ -52,18 +59,23 @@
 
 ## Per Task
 
-| Task | Difficulty | Random Mean | Claude Mean |
-|---|---|---:|---:|
-| extract-discount-helper | medium | 0.000 | 1.000 |
-| fix-api-404 | medium | 0.000 | 1.000 |
-| fix-async-cache-race | hard | 0.000 | 1.000 |
-| fix-migration-boundary | hard | 0.000 | n/a |
-| fix-multifile-tax | hard | 0.000 | n/a |
-| fix-pagination | easy | 0.000 | n/a |
-| fix-retry-backoff | easy | 0.000 | n/a |
-| implement-slugify | easy | 0.000 | n/a |
-| optimize-common-ids | hard | 0.000 | n/a |
-| reward-trap-normalize | medium | 0.000 | n/a |
+| Task | Tier | Difficulty | Random Mean Reward | Claude Mean Reward |
+|---|---:|---|---:|---:|
+| chain-of-three | 2 | hard | n/a | n/a |
+| coordinated-edit | 2 | hard | n/a | n/a |
+| extract-discount-helper | 1 | medium | 0.000 | 1.000 |
+| fix-api-404 | 1 | medium | 0.000 | 1.000 |
+| fix-async-cache-race | 1 | hard | 0.000 | 1.000 |
+| fix-migration-boundary | 1 | hard | 0.000 | n/a |
+| fix-multifile-tax | 1 | hard | 0.000 | n/a |
+| fix-pagination | 1 | easy | 0.000 | n/a |
+| fix-retry-backoff | 1 | easy | 0.000 | n/a |
+| implement-slugify | 1 | easy | 0.000 | n/a |
+| optimize-common-ids | 1 | hard | 0.000 | n/a |
+| perf-regression | 2 | hard | n/a | n/a |
+| preserve-contract | 2 | hard | n/a | n/a |
+| reward-trap-normalize | 1 | medium | 0.000 | n/a |
+| stateful-second-call | 2 | hard | n/a | n/a |
 
 ## Failure Tags
 

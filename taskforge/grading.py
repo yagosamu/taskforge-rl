@@ -33,7 +33,7 @@ def run_pytest(
     """Run pytest for selected files and parse a robust test report."""
     args = [str(file) for file in files]
     result = runner.exec(
-        [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", *args],
+        [sys.executable, "-m", "pytest", "-vv", "-p", "no:cacheprovider", *args],
         cwd=workspace,
         timeout_s=timeout_s,
     )
@@ -50,6 +50,7 @@ def run_pytest(
         stdout=result.stdout,
         stderr=result.stderr,
         timed_out=result.timed_out,
+        results=_parse_pytest_results(output),
     )
 
 
@@ -81,6 +82,10 @@ def test_pass_ratio(task: TaskSpec, report: TestReport) -> RewardBreakdown:
             "passed": float(report.passed),
             "total": float(report.total),
             "pass_ratio": reward if report.total else 0.0,
+            **{
+                f"test:{name}": 1.0 if outcome == "passed" else 0.0
+                for name, outcome in sorted(report.results.items())
+            },
         },
         reason=reason,
         report=report,
@@ -102,3 +107,11 @@ def _parse_pytest_counts(output: str) -> dict[str, int]:
     if "error" in output.lower() and counts["passed"] == counts["failed"] == counts["errors"] == 0:
         counts["errors"] = 1
     return counts
+
+
+def _parse_pytest_results(output: str) -> dict[str, str]:
+    results: dict[str, str] = {}
+    pattern = re.compile(r"^(\S+::\S+)\s+(PASSED|FAILED|ERROR|SKIPPED)\b", re.MULTILINE)
+    for nodeid, outcome in pattern.findall(output):
+        results[nodeid] = outcome.lower()
+    return results

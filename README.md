@@ -48,6 +48,7 @@ limits:
   max_observation_chars: 4000
 metadata:
   difficulty: easy
+  tier: 1
   tags: [swallowed-exception, retry]
 ```
 
@@ -58,13 +59,16 @@ Authoring checklist:
 3. Applying `solution/` makes hidden reward exactly `1.0`.
 4. Visible tests also pass with `solution/`.
 5. Hidden tests and solution files are absent from the initial workspace.
-6. `metadata.difficulty` and `metadata.tags` are set for reporting.
+6. `metadata.difficulty`, `metadata.tier`, and `metadata.tags` are set for
+   filtering and reporting.
 
 ## Results
 
 These numbers come from the checked-in `report.md`: random ran 30 episodes
-across the 10-task pack; Claude ran 3 episodes before `--max-cost-usd 0.10`
-stopped launching new work.
+across the tier-1 pack; Claude ran 3 tier-1 episodes before `--max-cost-usd
+0.10` stopped launching new work. Tier-2 tasks use multiple hidden tests and
+fractional reward, so their mean reward tables are gradients, not directly
+comparable with the older pass/fail-only numbers.
 
 | Policy | Episodes | pass@1 | pass@3 | Mean Reward | Mean Steps | Cost |
 |---|---:|---:|---:|---:|---:|---:|
@@ -99,6 +103,7 @@ python -m venv .venv
 .venv\Scripts\taskforge verify tasks --runner subprocess
 .venv\Scripts\taskforge run fix-retry-backoff --policy scripted --verbose-trajectory
 .venv\Scripts\taskforge eval --tasks tasks --policy random --n 3 --yes --out runs/random
+.venv\Scripts\taskforge eval --tasks tasks --policy random --tier 2 --tag performance --n 1
 .venv\Scripts\taskforge report runs/random --out report.md
 .venv\Scripts\taskforge view examples/failed/fix-retry-backoff-failed.jsonl --out viewer.html
 ```
@@ -120,6 +125,26 @@ $env:ANTHROPIC_API_KEY = "..."
 
 You can also put `ANTHROPIC_API_KEY=...` in a local `.env`; TaskForge loads it
 without logging or persisting the secret.
+
+Step-budget sweep:
+
+```bash
+.venv\Scripts\taskforge sweep `
+  --tasks tasks `
+  --policy claude `
+  --max-steps 3,5,25 `
+  --n 1 `
+  --tier 2 `
+  --max-cost-usd 1.00 `
+  --out runs/sweep-tier2
+```
+
+`sweep` defaults to `--n 1` because Claude runs at `temperature=0` by default,
+so extra samples usually repeat the same trajectory. Before any model call it
+prints planned episodes per budget and projected cost using the measured
+`$0.055` per episode rate. The sweep is resumable: completed
+`(task, max_steps, seed)` cells in `sweep.json` are reused, and cells skipped by
+the global cost cap are written as `not_run`.
 
 ## Action Space
 
@@ -160,13 +185,15 @@ fresh workspace and checks the same terminal reward.
 ```
 
 The Markdown report includes headline metrics, breakdowns by difficulty and
-task tag, per-task random-vs-Claude results, failure-tag distribution, and cost
-summary. The HTML viewer is a single self-contained file with inline CSS and JS;
-it opens directly from the filesystem.
+tier, task tag breakdowns, per-task mean fractional reward for random and
+Claude, failure-tag distribution, and cost summary. Sweep reports include pass@1
+per step budget plus an ASCII sparkline. The HTML viewer is a single
+self-contained file with inline CSS and JS; it opens directly from the
+filesystem.
 
 ## Limitations
 
-- The task pack is intentionally small: 10 Python tasks, not a benchmark.
+- The task pack is intentionally small: 15 Python tasks, not a benchmark.
 - Claude numbers depend on model version, temperature, API availability, and
   budget guardrails.
 - DockerRunner is implemented but not yet tested on Windows Docker Desktop.

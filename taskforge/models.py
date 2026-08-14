@@ -62,6 +62,7 @@ class MetadataSpec(BaseModel):
 
     difficulty: str = "unspecified"
     tags: list[str] = Field(default_factory=list)
+    tier: int = Field(default=1, ge=1)
 
 
 class TaskSpec(BaseModel):
@@ -151,6 +152,7 @@ class TestReport(BaseModel):
     stdout: str
     stderr: str
     timed_out: bool = False
+    results: dict[str, str] = Field(default_factory=dict)
 
 
 class RewardBreakdown(BaseModel):

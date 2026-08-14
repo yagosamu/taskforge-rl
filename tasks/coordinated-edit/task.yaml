@@ -1,0 +1,26 @@
+id: coordinated-edit
+title: Keep status parsing and caller logic coordinated
+description: >
+  summarize_job(row) must return {"state": str, "retryable": bool}. Input rows
+  contain status_code as a string. Codes 200-299 are "ok" and not retryable,
+  400-499 are "client_error" and not retryable, 500-599 are "server_error" and
+  retryable, and anything else is "unknown" and retryable. The fix requires the
+  parser and its caller to agree on the shape they exchange.
+workspace: workspace
+solution: solution
+tests:
+  visible:
+    - tests/test_basic.py
+  hidden:
+    - tests/test_grading.py
+reward:
+  type: test_pass_ratio
+limits:
+  max_steps: 25
+metadata:
+  difficulty: hard
+  tier: 2
+  tags:
+    - coordinated-edit
+    - api
+    - contracts

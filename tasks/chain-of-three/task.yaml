@@ -1,0 +1,26 @@
+id: chain-of-three
+title: Fix the source of invoice rounding drift
+description: >
+  invoice_summary(order) must return a dict with subtotal_cents, discount_cents,
+  and total_cents. Prices are decimal strings in dollars. Convert each item price
+  to cents by rounding to the nearest cent before module B applies discounts and
+  module C builds the final summary. The failure appears in module C, but the
+  root cause is the cents conversion in module A.
+workspace: workspace
+solution: solution
+tests:
+  visible:
+    - tests/test_basic.py
+  hidden:
+    - tests/test_grading.py
+reward:
+  type: test_pass_ratio
+limits:
+  max_steps: 25
+metadata:
+  difficulty: hard
+  tier: 2
+  tags:
+    - multi-file
+    - rounding
+    - chain

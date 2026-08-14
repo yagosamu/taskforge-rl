@@ -28,8 +28,17 @@ def generate_report_markdown(report_paths: list[Path], *, tasks_dir: Path = Path
         "## By Difficulty",
         "",
         _breakdown_table(
+            "Difficulty",
             results,
             {task_id: task.metadata.difficulty for task_id, task in tasks.items()},
+        ),
+        "",
+        "## By Tier",
+        "",
+        _breakdown_table(
+            "Tier",
+            results,
+            {task_id: str(task.metadata.tier) for task_id, task in tasks.items()},
         ),
         "",
         "## By Tag",
@@ -87,8 +96,11 @@ def _headline_table(results: list[EpisodeResult]) -> str:
     return "\n".join(rows)
 
 
-def _breakdown_table(results: list[EpisodeResult], labels: dict[str, str]) -> str:
-    rows = ["| Difficulty | Policy | Episodes | Mean Reward | pass@1 |", "|---|---|---:|---:|---:|"]
+def _breakdown_table(label_name: str, results: list[EpisodeResult], labels: dict[str, str]) -> str:
+    rows = [
+        f"| {label_name} | Policy | Episodes | Mean Reward | pass@1 |",
+        "|---|---|---:|---:|---:|",
+    ]
     keys = sorted({labels.get(result.task_id, "unspecified") for result in results})
     for key in keys:
         for policy in sorted({result.policy_name for result in results}):
@@ -126,7 +138,10 @@ def _tag_table(results: list[EpisodeResult], tasks: dict[str, TaskSpec]) -> str:
 
 
 def _per_task_table(results: list[EpisodeResult], tasks: dict[str, TaskSpec]) -> str:
-    rows = ["| Task | Difficulty | Random Mean | Claude Mean |", "|---|---|---:|---:|"]
+    rows = [
+        "| Task | Tier | Difficulty | Random Mean Reward | Claude Mean Reward |",
+        "|---|---:|---|---:|---:|",
+    ]
     for task_id in sorted(tasks):
         random_rewards = [
             r.reward
@@ -139,7 +154,8 @@ def _per_task_table(results: list[EpisodeResult], tasks: dict[str, TaskSpec]) ->
             if r.task_id == task_id and r.policy_name == "claude"
         ]
         rows.append(
-            f"| {task_id} | {tasks[task_id].metadata.difficulty} | "
+            f"| {task_id} | {tasks[task_id].metadata.tier} | "
+            f"{tasks[task_id].metadata.difficulty} | "
             f"{_format_optional_mean(random_rewards)} | {_format_optional_mean(claude_rewards)} |"
         )
     return "\n".join(rows)

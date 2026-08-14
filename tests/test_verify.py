@@ -34,7 +34,9 @@ def test_verify_task_catches_bad_fixture(task_id: str, check_name: str) -> None:
 def test_shipped_tasks_pass_verification() -> None:
     """All shipped tasks pass the authoring verification suite."""
     failures: list[str] = []
-    for task in discover_tasks(Path("tasks")):
+    tasks = discover_tasks(Path("tasks"))
+    tier_two = [task for task in tasks if task.metadata.tier == 2]
+    for task in tasks:
         verification = verify_task(task, SubprocessRunner())
         failures.extend(
             f"{task.id}:{check.name}:{check.message}"
@@ -42,6 +44,8 @@ def test_shipped_tasks_pass_verification() -> None:
             if not check.passed
         )
 
+    assert len(tasks) == 15
+    assert len(tier_two) == 5
     assert failures == []
 
 

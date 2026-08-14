@@ -1,0 +1,25 @@
+id: perf-regression
+title: Remove quadratic work from common id lookup
+description: >
+  common_active_ids(left, right) must return a list of ids that appear in both
+  inputs and have active=True on both sides. Preserve the order from left and
+  include each matching id at most once. Each input item is a dict with keys id
+  and active. The implementation must handle large inputs without nested scans.
+workspace: workspace
+solution: solution
+tests:
+  visible:
+    - tests/test_basic.py
+  hidden:
+    - tests/test_grading.py
+reward:
+  type: test_pass_ratio
+limits:
+  max_steps: 25
+metadata:
+  difficulty: hard
+  tier: 2
+  tags:
+    - performance
+    - runtime-bounded
+    - algorithm

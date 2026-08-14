@@ -42,6 +42,31 @@ def test_pass_ratio_with_partial_credit() -> None:
     assert breakdown.reward == 0.75
 
 
+def test_partial_credit_components_include_per_test_results() -> None:
+    """Reward components expose individual hidden test outcomes."""
+    report = TaskForgeTestReport(
+        total=3,
+        passed=2,
+        failed=1,
+        errors=0,
+        skipped=0,
+        returncode=1,
+        stdout="",
+        stderr="",
+        results={
+            "tests/test_hidden.py::test_a": "passed",
+            "tests/test_hidden.py::test_b": "failed",
+            "tests/test_hidden.py::test_c": "passed",
+        },
+    )
+
+    breakdown = reward_test_pass_ratio(_task(partial_credit=True), report)
+
+    assert breakdown.reward == 2 / 3
+    assert breakdown.components["test:tests/test_hidden.py::test_a"] == 1.0
+    assert breakdown.components["test:tests/test_hidden.py::test_b"] == 0.0
+
+
 def test_pass_ratio_without_partial_credit() -> None:
     """All-or-nothing rewards are zero unless every hidden test passes."""
     report = TaskForgeTestReport(

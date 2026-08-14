@@ -12,6 +12,7 @@ import typer
 from taskforge.actions import parse_action
 from taskforge.env import TaskEnv
 from taskforge.evaluate import read_report, report_table, run_episode, run_eval
+from taskforge.filters import filter_tasks
 from taskforge.loader import discover_tasks, load_task
 from taskforge.models import TaskSpec, TaskValidationError
 from taskforge.policies.base import Policy
@@ -20,6 +21,13 @@ from taskforge.policies.random_policy import RandomPolicy
 from taskforge.policies.scripted import ScriptedPolicy
 from taskforge.reporting import discover_report_paths, generate_report_markdown
 from taskforge.runners import DockerRunner, SubprocessRunner
+from taskforge.sweep import (
+    MEASURED_COST_PER_EPISODE_USD,
+    estimate_sweep_cost,
+    planned_sweep_episodes,
+    run_sweep,
+    sweep_report,
+)
 from taskforge.trajectory import read_trajectory, summarize_episode
 from taskforge.verify import verify_task
 from taskforge.viewer import write_viewer
@@ -123,9 +131,11 @@ def eval(
     temperature: Annotated[float, typer.Option("--temperature")] = 0.0,
     yes: Annotated[bool, typer.Option("--yes")] = False,
     max_cost_usd: Annotated[float | None, typer.Option("--max-cost-usd")] = None,
+    tier: Annotated[int | None, typer.Option("--tier")] = None,
+    tags: Annotated[list[str] | None, typer.Option("--tag")] = None,
 ) -> None:
     """Run a parallel policy evaluation and save report.json."""
-    tasks = discover_tasks(tasks_dir)
+    tasks = filter_tasks(discover_tasks(tasks_dir), tier=tier, tags=tags)
     episodes = len(tasks) * n_samples
     low_cost, high_cost = _estimated_cost_range(policy_name, episodes)
     typer.echo(
@@ -147,6 +157,68 @@ def eval(
         max_steps=max_steps,
     )
     typer.echo(report_table(report))
+
+
+@app.command()
+def sweep(
+    tasks_dir: Annotated[Path, typer.Option("--tasks")] = Path("tasks"),
+    policy_name: Annotated[str, typer.Option("--policy")] = "claude",
+    max_steps_csv: Annotated[str, typer.Option("--max-steps")] = "3,5,25",
+    n_samples: Annotated[
+        int,
+        typer.Option(
+            "--n",
+            help=(
+                "Samples per task/budget. Defaults to 1 because temperature=0 "
+                "repeats the same trajectory."
+            ),
+        ),
+    ] = 1,
+    max_workers: Annotated[int, typer.Option("--max-workers")] = 1,
+    runner_name: Annotated[str, typer.Option("--runner")] = "subprocess",
+    out_dir: Annotated[Path | None, typer.Option("--out")] = None,
+    verbose_trajectory: Annotated[bool, typer.Option("--verbose-trajectory")] = False,
+    temperature: Annotated[float, typer.Option("--temperature")] = 0.0,
+    yes: Annotated[bool, typer.Option("--yes")] = False,
+    max_cost_usd: Annotated[float | None, typer.Option("--max-cost-usd")] = None,
+    tier: Annotated[int | None, typer.Option("--tier")] = None,
+    tags: Annotated[list[str] | None, typer.Option("--tag")] = None,
+) -> None:
+    """Run a resumable step-budget sweep."""
+    del max_workers
+    budgets = _parse_int_csv(max_steps_csv)
+    tasks = filter_tasks(discover_tasks(tasks_dir), tier=tier, tags=tags)
+    planned = planned_sweep_episodes(
+        task_count=len(tasks),
+        budgets=budgets,
+        n_samples=n_samples,
+    )
+    total_episodes = sum(planned.values())
+    estimated = estimate_sweep_cost(
+        task_count=len(tasks),
+        budgets=budgets,
+        n_samples=n_samples,
+        cost_per_episode_usd=MEASURED_COST_PER_EPISODE_USD,
+    )
+    typer.echo("MAX_STEPS\tEPISODES\tPROJECTED_COST")
+    for budget, episodes in planned.items():
+        typer.echo(f"{budget}\t{episodes}\t${episodes * MEASURED_COST_PER_EPISODE_USD:.4f}")
+    typer.echo(f"TOTAL\t{total_episodes}\t${estimated:.4f}")
+    if total_episodes > 20 and not yes:
+        raise typer.BadParameter("episode count exceeds threshold; pass --yes to proceed")
+    output = out_dir or Path("runs") / f"sweep-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    report = run_sweep(
+        tasks=tasks,
+        policy_factory=_policy_factory(policy_name, temperature=temperature),
+        runner_factory=lambda: _runner(runner_name),
+        budgets=budgets,
+        n_samples=n_samples,
+        out_dir=output,
+        policy_name=policy_name,
+        max_cost_usd=max_cost_usd,
+        verbose_trajectory=verbose_trajectory,
+    )
+    typer.echo(sweep_report(report))
 
 
 @app.command()
@@ -179,9 +251,11 @@ def verify(
     tasks_dir: Path,
     task_id: Annotated[str | None, typer.Option("--task")] = None,
     runner_name: Annotated[str, typer.Option("--runner")] = "subprocess",
+    tier: Annotated[int | None, typer.Option("--tier")] = None,
+    tags: Annotated[list[str] | None, typer.Option("--tag")] = None,
 ) -> None:
     """Verify task quality checks for CI."""
-    tasks = discover_tasks(tasks_dir)
+    tasks = filter_tasks(discover_tasks(tasks_dir), tier=tier, tags=tags)
     if task_id is not None:
         tasks = [task for task in tasks if task.id == task_id]
     if not tasks:
@@ -247,6 +321,16 @@ def _report_paths(run_dirs: list[Path]) -> list[Path]:
     if run_dirs:
         return [path / "report.json" if path.is_dir() else path for path in run_dirs]
     return discover_report_paths(Path("runs"))
+
+
+def _parse_int_csv(value: str) -> list[int]:
+    try:
+        parsed = [int(item.strip()) for item in value.split(",") if item.strip()]
+    except ValueError as exc:
+        raise typer.BadParameter("--max-steps must be a comma-separated integer list") from exc
+    if not parsed:
+        raise typer.BadParameter("--max-steps must include at least one value")
+    return parsed
 
 
 if __name__ == "__main__":

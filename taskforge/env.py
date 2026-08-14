@@ -71,6 +71,7 @@ class TaskEnv:
         self._trajectory: TrajectoryWriter | None = None
         self.workspace: Path | None = None
         self.step_count = 0
+        self.invalid_actions = 0
         self.done = False
         self.done_reason: str | None = None
         self._started_at = 0.0
@@ -81,6 +82,7 @@ class TaskEnv:
         self._workspace_cm = ephemeral_workspace(self.task)
         self.workspace = self._workspace_cm.__enter__()  # type: ignore[attr-defined]
         self.step_count = 0
+        self.invalid_actions = 0
         self.done = False
         self.done_reason = None
         self._started_at = time.monotonic()
@@ -147,9 +149,12 @@ class TaskEnv:
             elif isinstance(action, Finish):
                 self._finish("finish")
         except (OSError, UnicodeError, PathEscapeError) as exc:
-            last_output = str(exc)
+            if not isinstance(action, ReadFile | WriteFile | ListFiles):
+                raise
+            self.invalid_actions += 1
+            last_output = f"invalid action: {exc}"
+            info["invalid_action"] = True
             info["error"] = str(exc)
-            self._finish("error")
 
         if self.step_count >= self._max_steps():
             self._finish("step_limit")
@@ -160,6 +165,7 @@ class TaskEnv:
             breakdown = grade(self.task, self.workspace, self.runner)
             reward = breakdown.reward
             info["reward_breakdown"] = breakdown.model_dump(mode="json")
+        info["invalid_actions"] = self.invalid_actions
 
         obs = self._observation(last_output=last_output)
         result = StepResult(
@@ -177,6 +183,7 @@ class TaskEnv:
                 done=self.done,
                 done_reason=self.done_reason,
                 observation=obs,
+                invalid_actions=self.invalid_actions,
             )
         if self.done:
             self._emit("reward", {"reward": reward, "info": info})
@@ -185,6 +192,7 @@ class TaskEnv:
                     step=self.step_count,
                     terminal_reward=reward,
                     done_reason=self.done_reason or "unknown",
+                    invalid_actions=self.invalid_actions,
                 )
         return result
 
@@ -224,11 +232,13 @@ class TaskEnv:
                 done=True,
                 done_reason=self.done_reason,
                 observation=obs,
+                invalid_actions=self.invalid_actions,
             )
             self._trajectory.write_end(
                 step=self.step_count,
                 terminal_reward=result.reward,
                 done_reason=self.done_reason or reason,
+                invalid_actions=self.invalid_actions,
             )
         self._emit("reward", {"reward": result.reward, "info": result.info})
         return result

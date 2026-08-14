@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from taskforge.actions import Action, ListFiles
+from taskforge.actions import Action, Finish, ListFiles, ReadFile
 from taskforge.env import Observation
 from taskforge.evaluate import read_report, run_episode, run_eval
 from taskforge.loader import load_task
@@ -25,6 +25,32 @@ class NeverFinishPolicy:
         """Keep taking intermediate actions until the environment terminates."""
         del obs
         return ListFiles(path=".")
+
+    def stats(self) -> PolicyStats:
+        """Return zero-cost policy stats."""
+        return PolicyStats()
+
+
+class InvalidThenFinishPolicy:
+    """Policy that makes one invalid action and then finishes."""
+
+    name = "invalid_then_finish"
+
+    def __init__(self) -> None:
+        """Create the policy."""
+        self._acted = False
+
+    def reset(self) -> None:
+        """Reset policy state."""
+        self._acted = False
+
+    def act(self, obs: Observation) -> Action:
+        """Read a missing file once, then finish."""
+        del obs
+        if not self._acted:
+            self._acted = True
+            return ReadFile(path="missing.py")
+        return Finish()
 
     def stats(self) -> PolicyStats:
         """Return zero-cost policy stats."""
@@ -216,3 +242,19 @@ def test_run_episode_and_run_eval_share_task_step_limit(tmp_path: Path) -> None:
     assert single.reward == evaluated.reward
     assert single.steps == evaluated.steps == 25
     assert single.done_reason == evaluated.done_reason == "step_limit"
+
+
+def test_run_episode_records_invalid_actions_in_episode_result(tmp_path: Path) -> None:
+    """EpisodeResult includes the episode invalid action count."""
+    task = load_task(Path("tasks/fix-retry-backoff"))
+
+    result = run_episode(
+        task=task,
+        policy=InvalidThenFinishPolicy(),
+        runner=SubprocessRunner(),
+        seed=0,
+        trajectory_path=tmp_path / "invalid-result.jsonl",
+    )
+
+    assert result.done_reason == "finish"
+    assert result.invalid_actions == 1

@@ -65,6 +65,7 @@ def run_episode(
         tokens_out=stats.tokens_out,
         latency_s=stats.latency_s,
         cost_usd=stats.cost_usd,
+        invalid_actions=getattr(env, "invalid_actions", 0),
         error=error,
     )
 
@@ -131,6 +132,7 @@ def run_eval(
                         steps=0,
                         done_reason="error",
                         trajectory_path=str(trajectory),
+                        invalid_actions=0,
                         error=str(exc),
                     )
                 results.append(result)
@@ -161,12 +163,12 @@ def read_report(path: Path | str) -> EvalReport:
 def report_table(report: EvalReport) -> str:
     """Render a readable plain-text report table."""
     lines = [
-        "TASK\tSEED\tREWARD\tSTEPS\tDONE\tCOST\tERROR",
+        "TASK\tSEED\tREWARD\tSTEPS\tINVALID\tDONE\tCOST\tERROR",
         *[
             (
                 f"{result.task_id}\t{result.seed}\t{result.reward:.3f}\t"
-                f"{result.steps}\t{result.done_reason}\t${result.cost_usd:.6f}\t"
-                f"{result.error or ''}"
+                f"{result.steps}\t{result.invalid_actions}\t{result.done_reason}\t"
+                f"${result.cost_usd:.6f}\t{result.error or ''}"
             )
             for result in report.results
         ],

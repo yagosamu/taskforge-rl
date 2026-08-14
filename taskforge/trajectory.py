@@ -55,6 +55,7 @@ class StepRecord(BaseModel):
     done: bool
     done_reason: str | None
     observation: TrajectoryObservation
+    invalid_actions: int = 0
     ts: str
 
 
@@ -70,6 +71,7 @@ class EpisodeEndRecord(BaseModel):
     step: int
     terminal_reward: float
     done_reason: str
+    invalid_actions: int = 0
     ts: str
 
 
@@ -141,6 +143,7 @@ class TrajectoryWriter:
         done: bool,
         done_reason: str | None,
         observation: BaseModel,
+        invalid_actions: int = 0,
     ) -> None:
         """Write a step record."""
         record = StepRecord(
@@ -152,11 +155,19 @@ class TrajectoryWriter:
             done=done,
             done_reason=done_reason,
             observation=self._observation_ref(step, observation),
+            invalid_actions=invalid_actions,
             ts=_now(),
         )
         self._write(record)
 
-    def write_end(self, *, step: int, terminal_reward: float, done_reason: str) -> None:
+    def write_end(
+        self,
+        *,
+        step: int,
+        terminal_reward: float,
+        done_reason: str,
+        invalid_actions: int = 0,
+    ) -> None:
         """Write an episode_end record."""
         record = EpisodeEndRecord(
             run_id=self.run_id,
@@ -164,6 +175,7 @@ class TrajectoryWriter:
             step=step,
             terminal_reward=terminal_reward,
             done_reason=done_reason,
+            invalid_actions=invalid_actions,
             ts=_now(),
         )
         self._write(record)

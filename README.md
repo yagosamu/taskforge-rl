@@ -148,7 +148,8 @@ Supported actions:
 action parsing because hidden tests are reserved for grading. `ReadFile` and
 `WriteFile` resolve paths through `resolve_in_workspace()`, which rejects `..`,
 absolute paths outside the workspace, and symlinks that resolve outside the
-workspace.
+workspace. Invalid filesystem actions, such as missing files or escaped paths,
+consume one step and return an error observation, but they do not end the episode.
 
 Observation text is truncated by `taskforge/truncation.py` using the task limit
 `limits.max_observation_chars`, which defaults to `4000`. `Observation.truncated`
@@ -299,6 +300,7 @@ TASK    task id
 SEED    per-episode seed
 REWARD  terminal reward
 STEPS   environment steps
+INVALID invalid action count
 DONE    done_reason, such as finish, step_limit, timeout, or error
 COST    policy-reported USD cost
 ERROR   captured episode error, if any

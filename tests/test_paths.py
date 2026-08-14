@@ -45,7 +45,7 @@ def test_symlink_escape_raises(tmp_path: Path) -> None:
         resolve_in_workspace(workspace, "link.txt")
 
 
-def test_write_file_escape_paths_end_episode_without_writing(tmp_path: Path) -> None:
+def test_write_file_escape_paths_continue_without_writing(tmp_path: Path) -> None:
     """WriteFile escape attempts are rejected by the environment."""
     task = load_task(Path("tasks/fix-retry-backoff"))
     outside = tmp_path / "outside.txt"
@@ -55,7 +55,8 @@ def test_write_file_escape_paths_end_episode_without_writing(tmp_path: Path) -> 
             env.reset()
             result = env.step(WriteFile(path=bad_path, content="owned"))
 
-        assert result.done is True
-        assert result.done_reason == "error"
+        assert result.done is False
+        assert result.done_reason is None
         assert result.reward == 0.0
+        assert result.info["invalid_actions"] == 1
     assert not outside.exists()

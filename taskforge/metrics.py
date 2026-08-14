@@ -24,6 +24,7 @@ class EpisodeResult(BaseModel):
     tokens_out: int = 0
     latency_s: float = 0.0
     cost_usd: float = 0.0
+    invalid_actions: int = 0
     error: str | None = None
 
 

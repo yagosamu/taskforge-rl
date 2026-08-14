@@ -1,0 +1,23 @@
+id: fix-pagination
+title: Fix pagination so the last item is not lost
+description: >
+  The paginate helper should split a sequence into pages of the requested size
+  without losing trailing items.
+workspace: workspace
+tests:
+  visible:
+    - tests/test_basic.py
+  hidden:
+    - tests/test_grading.py
+reward:
+  type: test_pass_ratio
+  partial_credit: false
+budget:
+  test_timeout_s: 10
+limits:
+  max_steps: 25
+metadata:
+  difficulty: easy
+  tags:
+    - pagination
+    - off-by-one

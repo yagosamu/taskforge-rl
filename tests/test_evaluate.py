@@ -7,7 +7,7 @@ from pathlib import Path
 from taskforge.actions import Action, ListFiles
 from taskforge.env import Observation
 from taskforge.evaluate import read_report, run_episode, run_eval
-from taskforge.loader import discover_tasks, load_task
+from taskforge.loader import load_task
 from taskforge.policies.base import PolicyStats
 from taskforge.policies.scripted import ScriptedPolicy
 from taskforge.runners import SubprocessRunner
@@ -33,7 +33,7 @@ class NeverFinishPolicy:
 
 def test_run_eval_scripted_policy_writes_report(tmp_path: Path) -> None:
     """Scripted evaluation produces a well-formed saved report."""
-    tasks = discover_tasks(Path("tasks"))
+    tasks = [load_task(Path("tasks/fix-retry-backoff"))]
     report = run_eval(
         tasks,
         lambda seed: ScriptedPolicy(),
@@ -54,7 +54,7 @@ def test_run_eval_scripted_policy_writes_report(tmp_path: Path) -> None:
 
 def test_parallel_eval_matches_serial_results(tmp_path: Path) -> None:
     """Parallel execution produces the same per-task outcomes as serial execution."""
-    tasks = discover_tasks(Path("tasks"))
+    tasks = [load_task(Path("tasks/fix-retry-backoff"))]
     serial = run_eval(
         tasks,
         lambda seed: ScriptedPolicy(),
@@ -85,7 +85,7 @@ def test_parallel_eval_matches_serial_results(tmp_path: Path) -> None:
 
 def test_verbose_trajectory_writes_one_side_file_per_parallel_episode(tmp_path: Path) -> None:
     """Verbose parallel eval writes full observations beside each trajectory."""
-    tasks = discover_tasks(Path("tasks"))
+    tasks = [load_task(Path("tasks/fix-retry-backoff"))]
     report = run_eval(
         tasks,
         lambda seed: ScriptedPolicy(),

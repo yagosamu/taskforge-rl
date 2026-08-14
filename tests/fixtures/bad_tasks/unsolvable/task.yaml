@@ -1,0 +1,11 @@
+id: unsolvable
+title: Bad task whose solution fails
+workspace: workspace
+tests:
+  visible:
+    - tests/test_basic.py
+  hidden:
+    - tests/test_grading.py
+reward:
+  type: test_pass_ratio
+  partial_credit: false

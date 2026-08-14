@@ -18,13 +18,14 @@ TaskForge targets Python 3.11+ and keeps runtime dependencies minimal:
 ## Task Format
 
 A task lives in `tasks/<task-id>/` and contains a `task.yaml`, a source
-`workspace/`, and test files.
+`workspace/`, test files, and usually a reference `solution/`.
 
 ```yaml
 id: fix-retry-backoff
 title: Fix retry final exception propagation
 description: The coding-agent-facing task description.
 workspace: workspace
+solution: solution
 tests:
   visible:
     - tests/test_basic.py
@@ -39,6 +40,11 @@ budget:
 limits:
   max_observation_chars: 4000
   max_steps: 25
+metadata:
+  difficulty: easy
+  tags:
+    - swallowed-exception
+    - retry
 ```
 
 Validation checks that referenced files exist, visible and hidden test lists do
@@ -46,10 +52,12 @@ not overlap, the workspace directory exists, and `reward.type` is registered.
 The effective step budget is `--max-steps` when explicitly passed; otherwise it
 comes from the task's `limits.max_steps`.
 
-At runtime, TaskForge copies the workspace and tests into a temporary directory.
-Hidden tests are restored from the original task definition immediately before
-grading, so modifying hidden tests inside the temporary workspace does not affect
-the reward.
+At runtime, TaskForge copies the workspace and visible tests into a temporary
+directory. Hidden tests are restored from the original task definition
+immediately before grading, so modifying hidden tests inside the temporary
+workspace does not affect the reward. The optional `solution/` directory is
+never copied into the normal agent workspace. It is used only by
+`taskforge verify` to prove the task is solvable.
 
 ## Example
 
@@ -85,6 +93,39 @@ Run framework tests:
 ```bash
 python -m pytest
 python -m ruff check .
+```
+
+## Task QA
+
+Run task quality verification locally or in CI:
+
+```bash
+taskforge verify tasks/ --runner subprocess
+taskforge verify tasks/ --task fix-retry-backoff --runner subprocess
+```
+
+Verification checks:
+
+```text
+fails_initially     hidden tests fail on the pristine workspace
+solvable            applying solution/ makes hidden reward exactly 1.0
+visible_consistent  visible tests pass after applying solution/
+no_leakage          solution/ and hidden tests are absent from the initial workspace
+deterministic       grading the same workspace twice produces the same reward
+```
+
+Authoring checklist:
+
+```text
+1. Keep the prompt solvable from workspace/ alone.
+2. Put only agent-visible starter files in workspace/.
+3. Put visible tests in tests/ and list them under tests.visible.
+4. Put grading-only tests in tests/ and list them under tests.hidden.
+5. Put the reference fix in solution/, using paths relative to workspace/.
+6. Ensure the starter workspace gets reward < 1.0.
+7. Ensure solution/ gets reward == 1.0 and passes visible tests.
+8. Add metadata.difficulty and metadata.tags for reporting.
+9. Run taskforge verify tasks/ before committing.
 ```
 
 ## Action Space

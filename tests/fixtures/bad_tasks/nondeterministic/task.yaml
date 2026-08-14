@@ -1,0 +1,11 @@
+id: nondeterministic
+title: Bad task with nondeterministic grading
+workspace: workspace
+tests:
+  visible:
+    - tests/test_basic.py
+  hidden:
+    - tests/test_grading.py
+reward:
+  type: test_pass_ratio
+  partial_credit: false

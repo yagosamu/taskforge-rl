@@ -1,0 +1,11 @@
+id: visible-fails
+title: Bad task whose solution breaks visible tests
+workspace: workspace
+tests:
+  visible:
+    - tests/test_basic.py
+  hidden:
+    - tests/test_grading.py
+reward:
+  type: test_pass_ratio
+  partial_credit: false

@@ -20,6 +20,7 @@ from taskforge.policies.random_policy import RandomPolicy
 from taskforge.policies.scripted import ScriptedPolicy
 from taskforge.runners import DockerRunner, SubprocessRunner
 from taskforge.trajectory import read_trajectory, summarize_episode
+from taskforge.verify import verify_task
 
 app = typer.Typer(help="TaskForge task utilities.")
 CONFIRM_EPISODE_THRESHOLD = 10
@@ -150,6 +151,31 @@ def eval(
 def report(run_dir: Path) -> None:
     """Render a saved evaluation report."""
     typer.echo(report_table(read_report(run_dir)))
+
+
+@app.command()
+def verify(
+    tasks_dir: Path,
+    task_id: Annotated[str | None, typer.Option("--task")] = None,
+    runner_name: Annotated[str, typer.Option("--runner")] = "subprocess",
+) -> None:
+    """Verify task quality checks for CI."""
+    tasks = discover_tasks(tasks_dir)
+    if task_id is not None:
+        tasks = [task for task in tasks if task.id == task_id]
+    if not tasks:
+        raise typer.BadParameter("no tasks matched")
+    runner = _runner(runner_name)
+    failures = 0
+    typer.echo("TASK\tCHECK\tSTATUS\tDETAIL")
+    for task in tasks:
+        verification = verify_task(task, runner)
+        for check in verification.checks:
+            status = "OK" if check.passed else "FAIL"
+            failures += 0 if check.passed else 1
+            typer.echo(f"{task.id}\t{check.name}\t{status}\t{check.message}")
+    if failures:
+        raise typer.Exit(code=1)
 
 
 def _find_task(task_id: str) -> TaskSpec:

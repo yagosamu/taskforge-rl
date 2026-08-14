@@ -55,6 +55,15 @@ class LimitsSpec(BaseModel):
     max_steps: int = Field(default=25, ge=1)
 
 
+class MetadataSpec(BaseModel):
+    """Optional task metadata for authoring and reporting."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    difficulty: str = "unspecified"
+    tags: list[str] = Field(default_factory=list)
+
+
 class TaskSpec(BaseModel):
     """A complete, validated task definition."""
 
@@ -65,15 +74,22 @@ class TaskSpec(BaseModel):
     description: str = ""
     root: Path
     workspace: str = "workspace"
+    solution: str | None = None
     tests: TestSpec
     reward: RewardSpec
     budget: BudgetSpec = Field(default_factory=BudgetSpec)
     limits: LimitsSpec = Field(default_factory=LimitsSpec)
+    metadata: MetadataSpec = Field(default_factory=MetadataSpec)
 
     @property
     def workspace_path(self) -> Path:
         """Return the source workspace directory for this task."""
         return self.root / self.workspace
+
+    @property
+    def solution_path(self) -> Path | None:
+        """Return the optional source solution directory for this task."""
+        return self.root / self.solution if self.solution is not None else None
 
     @property
     def visible_test_paths(self) -> list[Path]:

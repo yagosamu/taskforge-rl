@@ -17,7 +17,7 @@ def ephemeral_workspace(task: TaskSpec) -> Iterator[Path]:
     with tempfile.TemporaryDirectory(prefix=f"taskforge-{task.id}-") as temp_name:
         destination = Path(temp_name)
         _copy_tree_safe(task.workspace_path, destination)
-        restore_tests(task, destination, include_visible=True, include_hidden=True)
+        restore_tests(task, destination, include_visible=True, include_hidden=False)
         yield destination
 
 
@@ -41,6 +41,13 @@ def restore_tests(
         if source.is_symlink():
             raise TaskValidationError(source, "test file must not be a symlink")
         shutil.copy2(source, target, follow_symlinks=False)
+
+
+def apply_solution(task: TaskSpec, workspace: Path) -> None:
+    """Overlay the task's reference solution files onto an ephemeral workspace."""
+    if task.solution_path is None:
+        raise TaskValidationError(task.root / "task.yaml", "task has no solution directory")
+    _copy_tree_safe(task.solution_path, workspace)
 
 
 def _copy_tree_safe(source: Path, destination: Path) -> None:

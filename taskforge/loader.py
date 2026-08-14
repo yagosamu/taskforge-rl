@@ -25,6 +25,8 @@ def load_task(path: Path | str) -> TaskSpec:
 
     data: dict[str, Any] = dict(raw)
     data["root"] = task_file.parent
+    if "solution" not in data and (task_file.parent / "solution").is_dir():
+        data["solution"] = "solution"
     try:
         task = TaskSpec.model_validate(data)
     except ValidationError as exc:
@@ -46,6 +48,8 @@ def _validate_references(task_file: Path, task: TaskSpec) -> None:
         raise TaskValidationError(task_file, f"unknown reward type: {task.reward.type}")
     if not task.workspace_path.is_dir():
         raise TaskValidationError(task_file, f"workspace directory not found: {task.workspace}")
+    if task.solution_path is not None and not task.solution_path.is_dir():
+        raise TaskValidationError(task_file, f"solution directory not found: {task.solution}")
     for test_path in task.all_test_paths:
         if not test_path.is_file():
             raise TaskValidationError(task_file, f"referenced test file not found: {test_path}")

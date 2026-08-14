@@ -1,0 +1,6 @@
+"""Broken implementation."""
+
+
+def answer() -> int:
+    """Return the answer."""
+    return 0

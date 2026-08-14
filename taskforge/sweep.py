@@ -174,10 +174,14 @@ def sweep_report(report: SweepReport) -> str:
 
 def sparkline(values: Sequence[float]) -> str:
     """Render a tiny ASCII sparkline for values in [0, 1]."""
-    ticks = " .:-=+*#%@"
     if not values:
         return ""
-    return "".join(ticks[min(round(value * (len(ticks) - 1)), len(ticks) - 1)] for value in values)
+    bars = []
+    width = 10
+    for value in values:
+        filled = min(round(value * width), width)
+        bars.append("[" + ("#" * filled).ljust(width, "-") + "]")
+    return " ".join(bars)
 
 
 def _load_existing(path: Path) -> SweepReport | None:

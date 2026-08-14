@@ -1,5 +1,53 @@
 # TaskForge Evaluation Report
 
+## Stage 6 Step-Budget Sweep
+
+Source: `runs/sweep-claude/sweep.json`.
+
+| Max Steps | Completed | pass@1 | Mean Reward | Total Cost |
+|---:|---:|---:|---:|---:|
+| 3 | 5/5 | 0.000 | 0.133 | $0.085200 |
+| 5 | 5/5 | 0.600 | 0.600 | $0.181956 |
+| 25 | 5/5 | 0.800 | 0.933 | $0.334824 |
+
+The tier-2 random baseline in `runs/sweep-random/sweep.json` has pass@1 `0.000`
+and mean reward `0.133` at max steps `3`, `5`, and `25`.
+
+## Stage 6 Unsolved Cell
+
+At `max_steps=25`, Claude solved 4/5 tier-2 tasks. The unsolved task was
+`chain-of-three`, with terminal reward `0.6666666666666666`, `9` steps,
+done reason `finish`, and cost `$0.08300700000000001`.
+
+Hidden test outcomes after replaying the recorded actions offline:
+
+| Hidden Test | Outcome |
+|---|---|
+| `tests/test_grading.py::test_rounds_half_cent_up_before_discount` | failed |
+| `tests/test_grading.py::test_rounds_each_unit_before_multiplying` | passed |
+| `tests/test_grading.py::test_discount_uses_rounded_subtotal` | passed |
+
+The action sequence was: list files, read `module_a.py`, read `module_b.py`,
+read `module_c.py`, read `tests/test_basic.py`, run visible tests, write
+`module_a.py`, run visible tests, finish. The written fix used
+`round(float(price) * 100)`, which did not implement decimal half-up rounding
+for `1.005`; that is why the half-cent hidden case stayed red.
+
+## Stage 6 Random Baseline Anomaly
+
+The pristine `perf-regression` workspace receives reward `0.6666666666666666`.
+It passes two hidden tests before any meaningful fix:
+
+| Hidden Test | Pristine Outcome |
+|---|---|
+| `tests/test_grading.py::test_preserves_left_order_and_deduplicates` | passed |
+| `tests/test_grading.py::test_requires_active_on_both_sides` | passed |
+| `tests/test_grading.py::test_large_input_runtime` | failed |
+
+This weakens the signal for that task: the hidden suite is mostly checking
+functional behaviour the starter implementation already satisfies, while the
+actual required fix is isolated to the runtime-bounded test.
+
 ## Headline
 
 | Policy | pass@1 | pass@3 | Mean Reward | Mean Steps | Mean Cost |

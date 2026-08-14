@@ -75,6 +75,21 @@ comparable with the older pass/fail-only numbers.
 | random | 30 | 0.000 | 0.000 | 0.000 | 5.23 | $0.000000 |
 | claude | 3 | 1.000 | 1.000 | 1.000 | 7.00 | $0.170124 |
 
+Tier 1 saturates: the available Claude tier-1 run has pass@1 `1.000`. Tier 2
+does not: the full tier-2 Claude sweep in `runs/sweep-claude/sweep.json`
+reaches pass@1 `0.800` at `max_steps=25`.
+
+Stage-6 tier-2 step-budget curve:
+
+| Max Steps | pass@1 | Mean Reward |
+|---:|---:|---:|
+| 3 | 0.000 | 0.133 |
+| 5 | 0.600 | 0.600 |
+| 25 | 0.800 | 0.933 |
+
+The jump from 3 to 5 steps is the first point where agents have enough room to
+inspect, edit, and run visible tests on several tier-2 tasks.
+
 Example artifacts are committed under `examples/`:
 
 - `examples/solved/fix-api-404-solved.jsonl` and `examples/solved/viewer.html`
@@ -190,6 +205,21 @@ Claude, failure-tag distribution, and cost summary. Sweep reports include pass@1
 per step budget plus an ASCII sparkline. The HTML viewer is a single
 self-contained file with inline CSS and JS; it opens directly from the
 filesystem.
+
+## What The Benchmark Does Not Measure
+
+The current tier-2 sweep does not prove robust decimal reasoning. The unsolved
+`max_steps=25` task is `chain-of-three`: Claude changed cents conversion to
+`round(float(price) * 100)`, earning terminal reward `0.6666666666666666`, but
+failed `tests/test_grading.py::test_rounds_half_cent_up_before_discount`
+because the task requires decimal half-up rounding for values such as `1.005`.
+
+The random tier-2 baseline also exposes a signal weakness in `perf-regression`.
+The pristine workspace already passes
+`tests/test_grading.py::test_preserves_left_order_and_deduplicates` and
+`tests/test_grading.py::test_requires_active_on_both_sides`; only
+`tests/test_grading.py::test_large_input_runtime` fails. That means its hidden
+suite gives reward `0.6666666666666666` before the actual performance fix.
 
 ## Limitations
 

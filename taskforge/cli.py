@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -9,12 +11,18 @@ import typer
 
 from taskforge.actions import Finish, RunTests, parse_action
 from taskforge.env import TaskEnv
+from taskforge.evaluate import read_report, report_table, run_eval
 from taskforge.loader import discover_tasks, load_task
 from taskforge.models import TaskSpec, TaskValidationError
+from taskforge.policies.base import Policy
+from taskforge.policies.claude import ClaudePolicy
+from taskforge.policies.random_policy import RandomPolicy
+from taskforge.policies.scripted import ScriptedPolicy
 from taskforge.runners import DockerRunner, SubprocessRunner
 from taskforge.trajectory import read_trajectory, summarize_episode
 
 app = typer.Typer(help="TaskForge task utilities.")
+CONFIRM_EPISODE_THRESHOLD = 10
 
 
 @app.command()
@@ -99,6 +107,46 @@ def replay(trajectory_jsonl: Path) -> None:
     typer.echo(f"replay ok: terminal reward {result.reward}")
 
 
+@app.command()
+def eval(
+    tasks_dir: Annotated[Path, typer.Option("--tasks")] = Path("tasks"),
+    policy_name: Annotated[str, typer.Option("--policy")] = "scripted",
+    n_samples: Annotated[int, typer.Option("--n")] = 3,
+    max_workers: Annotated[int, typer.Option("--max-workers")] = 4,
+    runner_name: Annotated[str, typer.Option("--runner")] = "subprocess",
+    out_dir: Annotated[Path | None, typer.Option("--out")] = None,
+    yes: Annotated[bool, typer.Option("--yes")] = False,
+    max_cost_usd: Annotated[float | None, typer.Option("--max-cost-usd")] = None,
+) -> None:
+    """Run a parallel policy evaluation and save report.json."""
+    tasks = discover_tasks(tasks_dir)
+    episodes = len(tasks) * n_samples
+    low_cost, high_cost = _estimated_cost_range(policy_name, episodes)
+    typer.echo(
+        f"Planned episodes: {episodes}; estimated cost range: "
+        f"${low_cost:.4f}-${high_cost:.4f}"
+    )
+    if episodes > CONFIRM_EPISODE_THRESHOLD and not yes:
+        raise typer.BadParameter("episode count exceeds threshold; pass --yes to proceed")
+    output = out_dir or Path("runs") / f"eval-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    report = run_eval(
+        tasks,
+        _policy_factory(policy_name),
+        n_samples,
+        max_workers,
+        runner_factory=lambda: _runner(runner_name),
+        out_dir=output,
+        max_cost_usd=max_cost_usd,
+    )
+    typer.echo(report_table(report))
+
+
+@app.command()
+def report(run_dir: Path) -> None:
+    """Render a saved evaluation report."""
+    typer.echo(report_table(read_report(run_dir)))
+
+
 def _find_task(task_id: str) -> TaskSpec:
     for task in discover_tasks(Path("tasks")):
         if task.id == task_id:
@@ -112,6 +160,25 @@ def _runner(runner_name: str) -> SubprocessRunner | DockerRunner:
     if runner_name == "docker":
         return DockerRunner()
     raise typer.BadParameter("runner must be one of: subprocess, docker")
+
+
+def _policy_factory(policy_name: str) -> Callable[[int], Policy]:
+    def factory(seed: int) -> Policy:
+        if policy_name == "scripted":
+            return ScriptedPolicy()
+        if policy_name == "random":
+            return RandomPolicy(seed=seed)
+        if policy_name == "claude":
+            return ClaudePolicy()
+        raise typer.BadParameter("policy must be one of: scripted, random, claude")
+
+    return factory
+
+
+def _estimated_cost_range(policy_name: str, episodes: int) -> tuple[float, float]:
+    if policy_name != "claude":
+        return 0.0, 0.0
+    return episodes * 0.001, episodes * 0.05
 
 
 def _echo_error(message: str) -> int:

@@ -195,6 +195,39 @@ class TaskEnv:
         self.workspace = None
         self._trajectory = None
 
+    def abort(self, reason: str = "error", message: str = "") -> StepResult:
+        """End an active episode after an unrecoverable external error."""
+        if self.workspace is None or self.done:
+            raise RuntimeError(
+                "reset() must be called before abort(), and done episodes cannot abort"
+            )
+        self._finish(reason)
+        breakdown = grade(self.task, self.workspace, self.runner)
+        obs = self._observation(last_output=message)
+        result = StepResult(
+            observation=obs,
+            reward=breakdown.reward,
+            done=True,
+            done_reason=self.done_reason,
+            info={"error": message, "reward_breakdown": breakdown.model_dump(mode="json")},
+        )
+        if self._trajectory is not None:
+            self._trajectory.write_step(
+                step=self.step_count,
+                action={"type": "abort", "reason": reason},
+                reward=result.reward,
+                done=True,
+                done_reason=self.done_reason,
+                observation=obs,
+            )
+            self._trajectory.write_end(
+                step=self.step_count,
+                terminal_reward=result.reward,
+                done_reason=self.done_reason or reason,
+            )
+        self._emit("reward", {"reward": result.reward, "info": result.info})
+        return result
+
     def _observation(self, *, last_output: str = "") -> Observation:
         assert self.workspace is not None
         max_chars = self.task.limits.max_observation_chars

@@ -11,6 +11,8 @@ from taskforge.models import TaskSpec
 from taskforge.policies.base import PolicyStats
 from taskforge.runners import SubprocessRunner
 from taskforge.sweep import (
+    SweepCell,
+    SweepReport,
     estimate_sweep_cost,
     planned_sweep_episodes,
     run_sweep,
@@ -128,6 +130,30 @@ def test_sweep_cost_cap_marks_remaining_cells_not_run(tmp_path: Path) -> None:
     assert (tmp_path / "cap" / "sweep.md").exists()
 
 
+def test_sweep_report_renders_one_bar_per_budget_row() -> None:
+    """Each sweep report row renders one bar for that row's value only."""
+    report = SweepReport(
+        policy_name="fake",
+        n_samples=1,
+        budgets=[3, 5, 25],
+        cells=[
+            _cell(task_id="a", max_steps=3, reward=0.0),
+            _cell(task_id="a", max_steps=5, reward=1.0),
+            _cell(task_id="a", max_steps=25, reward=1.0),
+        ],
+        total_cost_usd=0.0,
+    )
+
+    rows = [
+        row
+        for row in sweep_report(report).splitlines()
+        if row.startswith("| ") and not row.startswith("| Max") and not row.startswith("|---")
+    ]
+
+    assert len(rows) == 3
+    assert all(row.count("[") == 1 and row.count("]") == 1 for row in rows)
+
+
 def _write_task(path: Path, *, task_id: str, hidden_assertion: str) -> TaskSpec:
     (path / "workspace").mkdir(parents=True)
     (path / "tests").mkdir()
@@ -153,3 +179,20 @@ limits:
         encoding="utf-8",
     )
     return load_task(path)
+
+
+def _cell(*, task_id: str, max_steps: int, reward: float) -> SweepCell:
+    return SweepCell(
+        task_id=task_id,
+        max_steps=max_steps,
+        seed=max_steps,
+        status="completed",
+        result={
+            "task_id": task_id,
+            "policy_name": "fake",
+            "seed": max_steps,
+            "reward": reward,
+            "steps": 1,
+            "done_reason": "finish",
+        },
+    )

@@ -151,16 +151,14 @@ def read_sweep(path: Path | str) -> SweepReport:
 def sweep_report(report: SweepReport) -> str:
     """Render deterministic Markdown with pass@1 by step budget."""
     rows = ["| Max Steps | Completed | pass@1 | Mean Reward | Curve |", "|---:|---:|---:|---:|---|"]
-    values: list[float] = []
     for budget in report.budgets:
         cells = [cell for cell in report.cells if cell.max_steps == budget]
         completed = [cell for cell in cells if cell.result is not None]
         pass_1 = _pass_at_budget(completed, 1)
         mean_reward = _mean([cell.result.reward for cell in completed if cell.result])
-        values.append(pass_1)
         rows.append(
             f"| {budget} | {len(completed)}/{len(cells)} | {pass_1:.3f} | "
-            f"{mean_reward:.3f} | {sparkline(values)} |"
+            f"{mean_reward:.3f} | {sparkline([pass_1])} |"
         )
     rows.extend(
         [

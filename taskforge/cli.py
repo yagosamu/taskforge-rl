@@ -51,15 +51,18 @@ def run(
     trajectory: Annotated[Path | None, typer.Option("--trajectory")] = None,
     verbose_trajectory: Annotated[bool, typer.Option("--verbose-trajectory")] = False,
     max_steps: Annotated[int | None, typer.Option("--max-steps")] = None,
+    temperature: Annotated[float, typer.Option("--temperature")] = 0.0,
 ) -> None:
     """Run one task with a policy and print the episode result."""
     task = _find_task(task_id)
+    seed = 0
+    trajectory_path = trajectory or _default_run_trajectory(task_id=task.id, seed=seed)
     result = run_episode(
-        task,
-        policy=_policy_factory(policy)(0),
+        task=task,
+        policy=_policy_factory(policy, temperature=temperature)(seed),
         runner=_runner(runner_name),
-        seed=0,
-        trajectory_path=trajectory,
+        seed=seed,
+        trajectory_path=trajectory_path,
         verbose_trajectory=verbose_trajectory,
         max_steps=max_steps,
     )
@@ -114,6 +117,7 @@ def eval(
     out_dir: Annotated[Path | None, typer.Option("--out")] = None,
     verbose_trajectory: Annotated[bool, typer.Option("--verbose-trajectory")] = False,
     max_steps: Annotated[int | None, typer.Option("--max-steps")] = None,
+    temperature: Annotated[float, typer.Option("--temperature")] = 0.0,
     yes: Annotated[bool, typer.Option("--yes")] = False,
     max_cost_usd: Annotated[float | None, typer.Option("--max-cost-usd")] = None,
 ) -> None:
@@ -130,7 +134,7 @@ def eval(
     output = out_dir or Path("runs") / f"eval-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     report = run_eval(
         tasks=tasks,
-        policy_factory=_policy_factory(policy_name),
+        policy_factory=_policy_factory(policy_name, temperature=temperature),
         n_samples=n_samples,
         max_workers=max_workers,
         runner_factory=lambda: _runner(runner_name),
@@ -163,17 +167,22 @@ def _runner(runner_name: str) -> SubprocessRunner | DockerRunner:
     raise typer.BadParameter("runner must be one of: subprocess, docker")
 
 
-def _policy_factory(policy_name: str) -> Callable[[int], Policy]:
+def _policy_factory(policy_name: str, *, temperature: float = 0.0) -> Callable[[int], Policy]:
     def factory(seed: int) -> Policy:
         if policy_name == "scripted":
             return ScriptedPolicy()
         if policy_name == "random":
             return RandomPolicy(seed=seed)
         if policy_name == "claude":
-            return ClaudePolicy()
+            return ClaudePolicy(temperature=temperature)
         raise typer.BadParameter("policy must be one of: scripted, random, claude")
 
     return factory
+
+
+def _default_run_trajectory(*, task_id: str, seed: int) -> Path:
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    return Path("runs") / timestamp / f"{task_id}-{seed}.jsonl"
 
 
 def _estimated_cost_range(policy_name: str, episodes: int) -> tuple[float, float]:

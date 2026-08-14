@@ -34,6 +34,7 @@ def run_episode(
         runner=runner,
         trajectory_path=trajectory_path,
         verbose_trajectory=verbose_trajectory,
+        trajectory_metadata=_episode_metadata(policy=policy, seed=seed),
         max_steps=max_steps,
     ) as env:
         obs = env.reset()
@@ -179,3 +180,11 @@ def report_table(report: EvalReport) -> str:
     if report.stopped_by_max_cost:
         lines.append("stopped_by_max_cost=true")
     return "\n".join(lines)
+
+
+def _episode_metadata(*, policy: Policy, seed: int) -> dict[str, object]:
+    metadata: dict[str, object] = {"policy_name": policy.name, "seed": seed}
+    temperature = getattr(policy, "temperature", None)
+    if temperature is not None:
+        metadata["temperature"] = float(temperature)
+    return metadata

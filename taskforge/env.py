@@ -54,6 +54,7 @@ class TaskEnv:
         event_log_path: Path | None = None,
         trajectory_path: Path | None = None,
         verbose_trajectory: bool = False,
+        trajectory_metadata: dict[str, object] | None = None,
         max_steps: int | None = None,
     ) -> None:
         """Create an environment for one task."""
@@ -62,6 +63,7 @@ class TaskEnv:
         self.event_log_path = event_log_path
         self.trajectory_path = trajectory_path
         self.verbose_trajectory = verbose_trajectory
+        self.trajectory_metadata = trajectory_metadata or {}
         self.max_steps_override = max_steps
         self._workspace_cm: object | None = None
         self._logger_cm: object | None = None
@@ -90,6 +92,7 @@ class TaskEnv:
                 self.trajectory_path,
                 task_id=self.task.id,
                 verbose_observations=self.verbose_trajectory,
+                metadata=self.trajectory_metadata,
             )
         obs = self._observation()
         self._emit("reset", {"workspace": str(self.workspace)})

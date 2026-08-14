@@ -76,6 +76,10 @@ Run the scripted policy, which runs visible tests and then finishes:
 taskforge run fix-retry-backoff --policy scripted
 ```
 
+`taskforge run` always writes a trajectory. By default it uses
+`runs/<timestamp>/<task_id>-0.jsonl`; pass `--trajectory path/to/run.jsonl` to
+choose the file explicitly.
+
 Run framework tests:
 
 ```bash
@@ -157,6 +161,11 @@ Record examples:
     "side_file": "run.jsonl.observations.jsonl",
     "truncated": false
   },
+  "metadata": {
+    "policy_name": "claude",
+    "seed": 0,
+    "temperature": 0.7
+  },
   "ts": "2026-08-14T12:00:00+00:00"
 }
 ```
@@ -196,13 +205,14 @@ Run a parallel evaluation:
 ```bash
 taskforge eval \
   --tasks tasks/ \
-  --policy scripted \
+  --policy claude \
   --n 3 \
   --max-workers 4 \
   --runner subprocess \
   --out runs/eval-scripted/ \
   --verbose-trajectory \
-  --max-steps 25
+  --max-steps 25 \
+  --temperature 0.7
 ```
 
 Omit `--max-steps` to use each task's own configured step budget.
@@ -233,7 +243,9 @@ The output directory contains `report.json` and one trajectory JSONL per
 episode. With `--verbose-trajectory`, each episode also writes its full
 observations to a side file next to its trajectory, for example
 `fix-retry-backoff-0.jsonl.observations.jsonl`. Parallel runs use one side file
-per episode and do not share observation handles. Render a saved report with:
+per episode and do not share observation handles. The trajectory header records
+the policy name, seed, and policy temperature when present, so sampled runs can
+be interpreted later. Render a saved report with:
 
 ```bash
 taskforge report runs/eval-scripted/

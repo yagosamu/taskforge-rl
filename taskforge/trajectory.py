@@ -36,6 +36,7 @@ class EpisodeStartRecord(BaseModel):
     task_id: str
     step: int
     observation: TrajectoryObservation
+    metadata: dict[str, Any] = {}
     ts: str
 
 
@@ -109,12 +110,14 @@ class TrajectoryWriter:
         task_id: str,
         run_id: str | None = None,
         verbose_observations: bool = False,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Create a trajectory writer."""
         self.path = path
         self.task_id = task_id
         self.run_id = run_id or str(uuid4())
         self.verbose_observations = verbose_observations
+        self.metadata = metadata or {}
         self._side_path = path.with_suffix(path.suffix + ".observations.jsonl")
 
     def write_start(self, *, step: int, observation: BaseModel) -> None:
@@ -124,6 +127,7 @@ class TrajectoryWriter:
             task_id=self.task_id,
             step=step,
             observation=self._observation_ref(step, observation),
+            metadata=self.metadata,
             ts=_now(),
         )
         self._write(record)

@@ -248,9 +248,7 @@ class TaskEnv:
     def _max_steps(self) -> int:
         if self.max_steps_override is not None:
             return self.max_steps_override
-        if self.task.limits.max_steps is not None:
-            return self.task.limits.max_steps
-        return self.task.budget.max_steps
+        return self.task.limits.max_steps
 
     def _finish(self, done_reason: str) -> None:
         if not self.done:

@@ -13,6 +13,7 @@ reward:
   type: test_pass_ratio
   partial_credit: false
 budget:
-  max_steps: 3
   step_timeout_s: 5
   test_timeout_s: 10
+limits:
+  max_steps: 25

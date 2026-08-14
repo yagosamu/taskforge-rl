@@ -9,9 +9,9 @@ from typing import Annotated
 
 import typer
 
-from taskforge.actions import Finish, RunTests, parse_action
+from taskforge.actions import parse_action
 from taskforge.env import TaskEnv
-from taskforge.evaluate import read_report, report_table, run_eval
+from taskforge.evaluate import read_report, report_table, run_episode, run_eval
 from taskforge.loader import discover_tasks, load_task
 from taskforge.models import TaskSpec, TaskValidationError
 from taskforge.policies.base import Policy
@@ -52,23 +52,18 @@ def run(
     verbose_trajectory: Annotated[bool, typer.Option("--verbose-trajectory")] = False,
     max_steps: Annotated[int | None, typer.Option("--max-steps")] = None,
 ) -> None:
-    """Run a task with a hardcoded policy and print the reward breakdown."""
-    if policy != "scripted":
-        raise typer.BadParameter("only --policy scripted is implemented")
+    """Run one task with a policy and print the episode result."""
     task = _find_task(task_id)
-    runner = _runner(runner_name)
-    with TaskEnv(
+    result = run_episode(
         task,
-        runner=runner,
+        policy=_policy_factory(policy)(0),
+        runner=_runner(runner_name),
+        seed=0,
         trajectory_path=trajectory,
         verbose_trajectory=verbose_trajectory,
         max_steps=max_steps,
-    ) as env:
-        env.reset()
-        env.step(RunTests())
-        result = env.step(Finish())
-    breakdown = result.info.get("reward_breakdown")
-    typer.echo(breakdown)
+    )
+    typer.echo(result.model_dump_json(indent=2))
 
 
 @app.command()
@@ -134,10 +129,10 @@ def eval(
         raise typer.BadParameter("episode count exceeds threshold; pass --yes to proceed")
     output = out_dir or Path("runs") / f"eval-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     report = run_eval(
-        tasks,
-        _policy_factory(policy_name),
-        n_samples,
-        max_workers,
+        tasks=tasks,
+        policy_factory=_policy_factory(policy_name),
+        n_samples=n_samples,
+        max_workers=max_workers,
         runner_factory=lambda: _runner(runner_name),
         out_dir=output,
         max_cost_usd=max_cost_usd,

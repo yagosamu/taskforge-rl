@@ -52,7 +52,7 @@ class LimitsSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     max_observation_chars: int = Field(default=4000, ge=1)
-    max_steps: int | None = Field(default=None, ge=1)
+    max_steps: int = Field(default=25, ge=1)
 
 
 class TaskSpec(BaseModel):
@@ -89,6 +89,11 @@ class TaskSpec(BaseModel):
     def all_test_paths(self) -> list[Path]:
         """Return all referenced test paths rooted at the task directory."""
         return self.visible_test_paths + self.hidden_test_paths
+
+    @property
+    def max_steps(self) -> int:
+        """Return the task's canonical episode step budget."""
+        return self.limits.max_steps
 
     @model_validator(mode="after")
     def _ensure_test_sets_do_not_overlap(self) -> TaskSpec:

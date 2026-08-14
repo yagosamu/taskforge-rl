@@ -104,10 +104,10 @@ def run_eval(
                 trajectory = out_dir / f"{task.id}-{seed}.jsonl"
                 future = executor.submit(
                     run_episode,
-                    task,
-                    policy_factory(seed),
-                    runner_factory(),
-                    seed,
+                    task=task,
+                    policy=policy_factory(seed),
+                    runner=runner_factory(),
+                    seed=seed,
                     trajectory_path=trajectory,
                     verbose_trajectory=verbose_trajectory,
                     max_steps=max_steps,

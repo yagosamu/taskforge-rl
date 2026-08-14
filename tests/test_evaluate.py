@@ -6,7 +6,7 @@ from pathlib import Path
 
 from taskforge.actions import Action, ListFiles
 from taskforge.env import Observation
-from taskforge.evaluate import read_report, run_eval
+from taskforge.evaluate import read_report, run_episode, run_eval
 from taskforge.loader import discover_tasks, load_task
 from taskforge.policies.base import PolicyStats
 from taskforge.policies.scripted import ScriptedPolicy
@@ -190,3 +190,29 @@ limits:
 
     assert report.results[0].done_reason == "step_limit"
     assert report.results[0].steps == 2
+
+
+def test_run_episode_and_run_eval_share_task_step_limit(tmp_path: Path) -> None:
+    """Single-run and eval paths produce the same result for the same task and policy."""
+    task = load_task(Path("tasks/fix-retry-backoff"))
+
+    single = run_episode(
+        task=task,
+        policy=NeverFinishPolicy(),
+        runner=SubprocessRunner(),
+        seed=0,
+        trajectory_path=tmp_path / "single.jsonl",
+    )
+    report = run_eval(
+        tasks=[task],
+        policy_factory=lambda seed: NeverFinishPolicy(),
+        n_samples=1,
+        max_workers=1,
+        runner_factory=SubprocessRunner,
+        out_dir=tmp_path / "eval",
+    )
+    evaluated = report.results[0]
+
+    assert single.reward == evaluated.reward
+    assert single.steps == evaluated.steps == 25
+    assert single.done_reason == evaluated.done_reason == "step_limit"

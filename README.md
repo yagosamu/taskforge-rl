@@ -34,7 +34,6 @@ reward:
   type: test_pass_ratio
   partial_credit: false
 budget:
-  max_steps: 3
   step_timeout_s: 5
   test_timeout_s: 10
 limits:
@@ -44,9 +43,8 @@ limits:
 
 Validation checks that referenced files exist, visible and hidden test lists do
 not overlap, the workspace directory exists, and `reward.type` is registered.
-The effective step budget is `--max-steps` when explicitly passed, then
-`limits.max_steps` when declared by the task, then the older `budget.max_steps`
-field for compatibility with Stage 1 task files.
+The effective step budget is `--max-steps` when explicitly passed; otherwise it
+comes from the task's `limits.max_steps`.
 
 At runtime, TaskForge copies the workspace and tests into a temporary directory.
 Hidden tests are restored from the original task definition immediately before

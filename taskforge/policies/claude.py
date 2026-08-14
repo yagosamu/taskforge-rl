@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import time
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
@@ -175,14 +176,48 @@ def tool_schemas() -> list[dict[str, Any]]:
 
 
 def _anthropic_client() -> Any:
+    _load_dotenv()
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY is required for the Claude policy")
+        raise RuntimeError(
+            "ANTHROPIC_API_KEY is required for the Claude policy. "
+            "Export it in the environment or put ANTHROPIC_API_KEY=... in .env."
+        )
     try:
         import anthropic
     except ImportError as exc:
         raise RuntimeError("Install the anthropic SDK to use the Claude policy") from exc
     return anthropic.Anthropic(api_key=api_key)
+
+
+def _load_dotenv(start: Path | None = None) -> None:
+    """Load simple KEY=VALUE pairs from the nearest .env file without logging secrets."""
+    start_dir = (start or Path.cwd()).resolve()
+    for directory in [start_dir, *start_dir.parents]:
+        env_path = directory / ".env"
+        if env_path.is_file():
+            _load_env_file(env_path)
+            return
+
+
+def _load_env_file(path: Path) -> None:
+    """Load a .env file while preserving already-exported variables."""
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key or key in os.environ:
+            continue
+        os.environ[key] = _clean_env_value(value.strip())
+
+
+def _clean_env_value(value: str) -> str:
+    """Remove matching single or double quotes from an environment value."""
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
 
 
 def _first_tool_use(response: Any) -> Any | None:

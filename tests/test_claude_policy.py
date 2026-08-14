@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import os
 from types import SimpleNamespace
 from typing import Any
 
 from taskforge.actions import Finish, ReadFile
 from taskforge.env import Observation
-from taskforge.policies.claude import ClaudePolicy, tool_schemas
+from taskforge.policies.claude import ClaudePolicy, _load_dotenv, tool_schemas
 
 
 class FakeMessages:
@@ -103,3 +104,14 @@ def test_claude_repeated_failures_return_finish() -> None:
     action = policy.act(_obs())
 
     assert isinstance(action, Finish)
+
+
+def test_claude_loads_api_key_from_dotenv(tmp_path, monkeypatch) -> None:
+    """The Claude policy can load ANTHROPIC_API_KEY from a local .env file."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    (tmp_path / ".env").write_text('ANTHROPIC_API_KEY="test-key"\n', encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    _load_dotenv()
+
+    assert os.environ["ANTHROPIC_API_KEY"] == "test-key"

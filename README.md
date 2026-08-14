@@ -206,6 +206,12 @@ $env:ANTHROPIC_API_KEY = "..."
 taskforge eval --tasks tasks/ --policy claude --n 3 --max-workers 2 --yes --max-cost-usd 1.00
 ```
 
+Alternatively, put the key in a local `.env` file:
+
+```dotenv
+ANTHROPIC_API_KEY=...
+```
+
 Before an eval starts, TaskForge prints the planned episode count and an
 estimated cost range. Runs above the confirmation threshold require `--yes`.
 `--max-cost-usd` stops launching new episodes once accumulated reported cost

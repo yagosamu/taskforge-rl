@@ -33,10 +33,11 @@ read `module_c.py`, read `tests/test_basic.py`, run visible tests, write
 `round(float(price) * 100)`, which did not implement decimal half-up rounding
 for `1.005`; that is why the half-cent hidden case stayed red.
 
-## Stage 6 Random Baseline Anomaly
+## Stage 6 Random Baseline Follow-Up
 
-The pristine `perf-regression` workspace receives reward `0.6666666666666666`.
-It passes two hidden tests before any meaningful fix:
+The original `runs/sweep-random/sweep.json` artifact showed that the pristine
+`perf-regression` workspace received reward `0.6666666666666666`. It passed two
+hidden tests before any meaningful fix:
 
 | Hidden Test | Pristine Outcome |
 |---|---|
@@ -44,9 +45,11 @@ It passes two hidden tests before any meaningful fix:
 | `tests/test_grading.py::test_requires_active_on_both_sides` | passed |
 | `tests/test_grading.py::test_large_input_runtime` | failed |
 
-This weakens the signal for that task: the hidden suite is mostly checking
-functional behaviour the starter implementation already satisfies, while the
-actual required fix is isolated to the runtime-bounded test.
+That weakened the signal for the task. The hidden tests have since been
+tightened so those behavioural checks also require the optimized implementation
+to complete within the time bound. Re-running
+`taskforge verify tasks --task perf-regression --runner subprocess` now reports
+pristine reward `0.000`.
 
 ## Headline
 

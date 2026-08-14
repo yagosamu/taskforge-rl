@@ -253,6 +253,10 @@ def verify(
     runner_name: Annotated[str, typer.Option("--runner")] = "subprocess",
     tier: Annotated[int | None, typer.Option("--tier")] = None,
     tags: Annotated[list[str] | None, typer.Option("--tag")] = None,
+    pristine_reward_warning_threshold: Annotated[
+        float,
+        typer.Option("--pristine-reward-warning-threshold"),
+    ] = 0.0,
 ) -> None:
     """Verify task quality checks for CI."""
     tasks = filter_tasks(discover_tasks(tasks_dir), tier=tier, tags=tags)
@@ -262,13 +266,20 @@ def verify(
         raise typer.BadParameter("no tasks matched")
     runner = _runner(runner_name)
     failures = 0
-    typer.echo("TASK\tCHECK\tSTATUS\tDETAIL")
+    typer.echo("TASK\tPRISTINE_REWARD\tCHECK\tSTATUS\tDETAIL")
     for task in tasks:
-        verification = verify_task(task, runner)
+        verification = verify_task(
+            task,
+            runner,
+            pristine_reward_warning_threshold=pristine_reward_warning_threshold,
+        )
         for check in verification.checks:
-            status = "OK" if check.passed else "FAIL"
+            status = "FAIL" if not check.passed else "WARN" if check.level == "warning" else "OK"
             failures += 0 if check.passed else 1
-            typer.echo(f"{task.id}\t{check.name}\t{status}\t{check.message}")
+            typer.echo(
+                f"{task.id}\t{verification.pristine_reward:.3f}\t"
+                f"{check.name}\t{status}\t{check.message}"
+            )
     if failures:
         raise typer.Exit(code=1)
 

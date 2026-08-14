@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -20,6 +21,8 @@ class VerificationCheck(BaseModel):
     name: str
     passed: bool
     message: str
+    level: Literal["ok", "warning", "error"] = "ok"
+    reward: float | None = None
 
 
 class TaskVerification(BaseModel):
@@ -29,6 +32,7 @@ class TaskVerification(BaseModel):
 
     task_id: str
     checks: list[VerificationCheck]
+    pristine_reward: float
 
     @property
     def passed(self) -> bool:
@@ -36,25 +40,48 @@ class TaskVerification(BaseModel):
         return all(check.passed for check in self.checks)
 
 
-def verify_task(task: TaskSpec, runner: Runner) -> TaskVerification:
+def verify_task(
+    task: TaskSpec,
+    runner: Runner,
+    *,
+    pristine_reward_warning_threshold: float = 0.0,
+) -> TaskVerification:
     """Verify that a task is failing, solvable, leak-free, and deterministic."""
+    fails_initially = _fails_initially(
+        task,
+        runner,
+        warning_threshold=pristine_reward_warning_threshold,
+    )
     checks = [
-        _fails_initially(task, runner),
+        fails_initially,
         _solvable(task, runner),
         _visible_consistent(task, runner),
         _no_leakage(task),
         _deterministic(task, runner),
     ]
-    return TaskVerification(task_id=task.id, checks=checks)
+    return TaskVerification(
+        task_id=task.id,
+        checks=checks,
+        pristine_reward=fails_initially.reward or 0.0,
+    )
 
 
-def _fails_initially(task: TaskSpec, runner: Runner) -> VerificationCheck:
+def _fails_initially(
+    task: TaskSpec,
+    runner: Runner,
+    *,
+    warning_threshold: float,
+) -> VerificationCheck:
     with ephemeral_workspace(task) as workspace:
         reward = grade(task, workspace, runner).reward
+    passed = reward < 1.0
+    warning = passed and reward > warning_threshold
     return VerificationCheck(
         name="fails_initially",
-        passed=reward < 1.0,
+        passed=passed,
         message=f"initial hidden reward={reward:.3f}",
+        level="warning" if warning else "ok" if passed else "error",
+        reward=reward,
     )
 
 

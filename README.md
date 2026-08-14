@@ -123,6 +123,10 @@ python -m venv .venv
 .venv\Scripts\taskforge view examples/failed/fix-retry-backoff-failed.jsonl --out viewer.html
 ```
 
+`verify` prints a `PRISTINE_REWARD` column for every task. By default, a task
+whose pristine reward is above `0.0` is marked `WARN`; tune that with
+`--pristine-reward-warning-threshold`.
+
 Claude policy:
 
 ```bash
@@ -214,12 +218,13 @@ The current tier-2 sweep does not prove robust decimal reasoning. The unsolved
 failed `tests/test_grading.py::test_rounds_half_cent_up_before_discount`
 because the task requires decimal half-up rounding for values such as `1.005`.
 
-The random tier-2 baseline also exposes a signal weakness in `perf-regression`.
-The pristine workspace already passes
+The original random tier-2 sweep exposed a signal weakness in `perf-regression`:
+the pristine workspace passed
 `tests/test_grading.py::test_preserves_left_order_and_deduplicates` and
-`tests/test_grading.py::test_requires_active_on_both_sides`; only
-`tests/test_grading.py::test_large_input_runtime` fails. That means its hidden
-suite gives reward `0.6666666666666666` before the actual performance fix.
+`tests/test_grading.py::test_requires_active_on_both_sides`, so it received
+reward `0.6666666666666666` before the actual performance fix. Those hidden
+tests now include the same runtime pressure as the performance case; current
+verification reports pristine reward `0.000` for `perf-regression`.
 
 ## Limitations
 

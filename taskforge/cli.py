@@ -18,9 +18,11 @@ from taskforge.policies.base import Policy
 from taskforge.policies.claude import ClaudePolicy
 from taskforge.policies.random_policy import RandomPolicy
 from taskforge.policies.scripted import ScriptedPolicy
+from taskforge.reporting import discover_report_paths, generate_report_markdown
 from taskforge.runners import DockerRunner, SubprocessRunner
 from taskforge.trajectory import read_trajectory, summarize_episode
 from taskforge.verify import verify_task
+from taskforge.viewer import write_viewer
 
 app = typer.Typer(help="TaskForge task utilities.")
 CONFIRM_EPISODE_THRESHOLD = 10
@@ -148,9 +150,28 @@ def eval(
 
 
 @app.command()
-def report(run_dir: Path) -> None:
-    """Render a saved evaluation report."""
-    typer.echo(report_table(read_report(run_dir)))
+def report(
+    run_dirs: Annotated[list[Path] | None, typer.Argument()] = None,
+    out: Annotated[Path | None, typer.Option("--out")] = None,
+) -> None:
+    """Render saved evaluation reports or write a Markdown analysis report."""
+    paths = _report_paths(run_dirs or [])
+    if out is None and len(paths) == 1:
+        typer.echo(report_table(read_report(paths[0])))
+        return
+    markdown = generate_report_markdown(paths)
+    if out is None:
+        typer.echo(markdown)
+        return
+    out.write_text(markdown, encoding="utf-8")
+    typer.echo(f"wrote {out}")
+
+
+@app.command()
+def view(trajectory_jsonl: Path, out: Annotated[Path, typer.Option("--out")]) -> None:
+    """Generate a self-contained HTML trajectory viewer."""
+    write_viewer(trajectory_jsonl, out)
+    typer.echo(f"wrote {out}")
 
 
 @app.command()
@@ -220,6 +241,12 @@ def _estimated_cost_range(policy_name: str, episodes: int) -> tuple[float, float
 def _echo_error(message: str) -> int:
     typer.echo(message, err=True)
     return 1
+
+
+def _report_paths(run_dirs: list[Path]) -> list[Path]:
+    if run_dirs:
+        return [path / "report.json" if path.is_dir() else path for path in run_dirs]
+    return discover_report_paths(Path("runs"))
 
 
 if __name__ == "__main__":

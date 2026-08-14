@@ -105,7 +105,7 @@ class TaskEnv:
             self._trajectory.write_start(step=self.step_count, observation=obs)
         return obs
 
-    def step(self, action: Action) -> StepResult:
+    def step(self, action: Action, *, cumulative_cost_usd: float = 0.0) -> StepResult:
         """Apply an action, decrement the step budget, and return the result."""
         if self.workspace is None or self.done:
             raise RuntimeError(
@@ -155,9 +155,9 @@ class TaskEnv:
             if not isinstance(action, ReadFile | WriteFile | ListFiles):
                 raise
             self.invalid_actions += 1
-            last_output = f"invalid action: {exc}"
+            last_output = f"invalid action: {self._sanitize_output(str(exc))}"
             info["invalid_action"] = True
-            info["error"] = str(exc)
+            info["error"] = self._sanitize_output(str(exc))
 
         if self.step_count >= self._max_steps():
             self._finish("step_limit")
@@ -187,6 +187,7 @@ class TaskEnv:
                 done_reason=self.done_reason,
                 observation=obs,
                 invalid_actions=self.invalid_actions,
+                cumulative_cost_usd=cumulative_cost_usd,
             )
         if self.done:
             self._emit("reward", {"reward": reward, "info": info})
@@ -219,7 +220,7 @@ class TaskEnv:
             )
         self._finish(reason)
         breakdown = grade(self.task, self.workspace, self.runner)
-        obs = self._observation(last_output=message)
+        obs = self._observation(last_output=self._sanitize_output(message))
         result = StepResult(
             observation=obs,
             reward=breakdown.reward,
@@ -236,6 +237,7 @@ class TaskEnv:
                 done_reason=self.done_reason,
                 observation=obs,
                 invalid_actions=self.invalid_actions,
+                cumulative_cost_usd=0.0,
             )
             self._trajectory.write_end(
                 step=self.step_count,
@@ -252,7 +254,7 @@ class TaskEnv:
         task_id, truncated_task = truncate(self.task.id, max_chars)
         statement, truncated_statement = truncate(self._task_statement(), max_chars)
         workspace, truncated_workspace = truncate(WORKSPACE_PLACEHOLDER, max_chars)
-        output, truncated_output = truncate(last_output, max_chars)
+        output, truncated_output = truncate(self._sanitize_output(last_output), max_chars)
         return Observation(
             task_id=task_id,
             task_statement=statement,
@@ -282,6 +284,16 @@ class TaskEnv:
         if not self.done:
             self.done = True
             self.done_reason = done_reason
+
+    def _sanitize_output(self, text: str) -> str:
+        if self.workspace is None:
+            return text
+        root = self.workspace.resolve()
+        sanitized = text
+        root_text = str(root)
+        for variant in {root_text, root_text.replace("\\", "\\\\"), root.as_posix()}:
+            sanitized = sanitized.replace(variant, WORKSPACE_PLACEHOLDER)
+        return sanitized
 
     def _emit(self, event_type: str, payload: dict[str, object]) -> None:
         if self._logger is not None:

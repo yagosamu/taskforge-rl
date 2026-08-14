@@ -56,6 +56,7 @@ class StepRecord(BaseModel):
     done_reason: str | None
     observation: TrajectoryObservation
     invalid_actions: int = 0
+    cumulative_cost_usd: float = 0.0
     ts: str
 
 
@@ -144,6 +145,7 @@ class TrajectoryWriter:
         done_reason: str | None,
         observation: BaseModel,
         invalid_actions: int = 0,
+        cumulative_cost_usd: float = 0.0,
     ) -> None:
         """Write a step record."""
         record = StepRecord(
@@ -156,6 +158,7 @@ class TrajectoryWriter:
             done_reason=done_reason,
             observation=self._observation_ref(step, observation),
             invalid_actions=invalid_actions,
+            cumulative_cost_usd=cumulative_cost_usd,
             ts=_now(),
         )
         self._write(record)

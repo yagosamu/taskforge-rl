@@ -68,6 +68,7 @@ def test_reading_missing_file_continues_and_counts_invalid_action() -> None:
 
     with TaskEnv(task) as env:
         env.reset()
+        real_workspace = env.workspace
         result = env.step(ReadFile(path="missing.py"))
 
     assert result.done is False
@@ -75,6 +76,9 @@ def test_reading_missing_file_continues_and_counts_invalid_action() -> None:
     assert result.info["invalid_action"] is True
     assert result.info["invalid_actions"] == 1
     assert "invalid action" in result.observation.last_output
+    assert real_workspace is not None
+    assert str(real_workspace) not in result.observation.last_output
+    assert "/workspace" in result.observation.last_output.replace("\\", "/")
 
 
 def test_writing_outside_workspace_continues_and_counts_invalid_action(tmp_path: Path) -> None:

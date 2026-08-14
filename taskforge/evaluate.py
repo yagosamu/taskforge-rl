@@ -42,7 +42,7 @@ def run_episode(
         try:
             while True:
                 action = policy.act(obs)
-                result = env.step(action)
+                result = env.step(action, cumulative_cost_usd=policy.stats().cost_usd)
                 obs = result.observation
                 if result.done:
                     break

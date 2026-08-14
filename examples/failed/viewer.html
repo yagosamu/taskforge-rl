@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TaskForge Trajectory Viewer</title>
+<style>
+body { font-family: system-ui, sans-serif; margin: 2rem; background: #f8fafc; color: #111827; }
+.header { padding: 1rem; border-radius: 8px; background: white; border-left: 8px solid #ef4444; }
+.header.solved { border-left-color: #22c55e; }
+.tag { display: inline-block; padding: .15rem .45rem; margin: .15rem;
+  border-radius: 999px; background: #e5e7eb; }
+.step { margin: 1rem 0; padding: 1rem; background: white;
+  border-radius: 8px; border: 1px solid #e5e7eb; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f3f4f6;
+  padding: .75rem; border-radius: 6px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="application/json" id="data">{"done_reason": "finish", "solved": false, "start": {"metadata": {"policy_name": "scripted", "seed": 0}, "observation": {"digest": "7b7ba07ef38ef4792fe6eabca334323924807e02e7fced4e67624fc3ad7d2ff5", "side_file": "fix-retry-backoff-failed.jsonl.observations.jsonl", "truncated": false}, "record_type": "episode_start", "run_id": "21c7e420-2812-4e4c-ad42-0d8858edee1e", "schema_version": "1.0", "step": 0, "task_id": "fix-retry-backoff", "ts": "2026-08-14T18:41:47.507700+00:00"}, "steps": [{"action": {"scope": "visible", "type": "run_tests"}, "cumulative_cost_usd": 0.0, "done": false, "done_reason": null, "invalid_actions": 0, "observation": {"last_output": ".                                                                        [100%]\n1 passed in 0.01s\n", "remaining_steps": 24, "step": 1, "task_id": "fix-retry-backoff", "task_statement": "Fix retry final exception propagation\n\nThe retry helper should return successful attempts, but when all attempts fail it must re-raise the final exception instead of returning None.", "truncated": false, "workspace": "/workspace"}, "reward": 0.0, "step": 1}, {"action": {"type": "finish"}, "cumulative_cost_usd": 0.0, "done": true, "done_reason": "finish", "invalid_actions": 0, "observation": {"last_output": "", "remaining_steps": 23, "step": 2, "task_id": "fix-retry-backoff", "task_statement": "Fix retry final exception propagation\n\nThe retry helper should return successful attempts, but when all attempts fail it must re-raise the final exception instead of returning None.", "truncated": false, "workspace": "/workspace"}, "reward": 0.0, "step": 2}], "tags": ["gave_up_early"], "terminal_reward": 0.0, "trajectory": "fix-retry-backoff-failed.jsonl"}</script>
+<script>
+const data = JSON.parse(document.getElementById('data').textContent);
+const app = document.getElementById('app');
+const header = document.createElement('section');
+header.className = 'header' + (data.solved ? ' solved' : '');
+header.innerHTML = `<h1>${data.trajectory}</h1>
+<p>Reward: ${data.terminal_reward} · Done: ${data.done_reason}</p>
+<p>${data.tags.map(t => `<span class="tag">${t}</span>`).join('')
+  || '<span class="tag">solved</span>'}</p>`;
+app.appendChild(header);
+for (const step of data.steps) {
+  const el = document.createElement('section');
+  el.className = 'step';
+  el.innerHTML = `<h2>Step ${step.step}</h2>
+  <p>Reward: ${step.reward} · Cost: $${step.cumulative_cost_usd.toFixed(6)}
+  · Invalid actions: ${step.invalid_actions}</p>
+  <h3>Action</h3><pre>${JSON.stringify(step.action, null, 2)}</pre>
+  <h3>Observation</h3><pre>${JSON.stringify(step.observation, null, 2)}</pre>`;
+  app.appendChild(el);
+}
+</script>
+</body>
+</html>

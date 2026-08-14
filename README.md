@@ -1,140 +1,129 @@
 # TaskForge
 
-TaskForge is a small Python framework for defining and running verifiable RL-style
-coding tasks. This first stage runs a single task end to end and produces a
-reward from hidden pytest tests. There is no LLM, agent harness, Docker runner,
-or UI yet.
+TaskForge is a Python framework for turning coding tasks into verifiable RL
+environments: an agent edits an isolated workspace, hidden tests compute the
+terminal reward, and every action is captured as a replayable trajectory. That
+reward signal matters because it lets you compare policies, tune prompts, and
+study failures without trusting self-reports from the model.
 
-## Install
-
-```bash
-python -m pip install -e ".[dev]"
+```text
+task.yaml + workspace/
+        |
+        v
+  TaskEnv.reset()  -> observation with task statement
+        |
+        v
+ policy action: read, write, list, run visible tests, finish
+        |
+        v
+  TaskEnv.step()   -> observation, reward 0 while running
+        |
+        v
+ finish / limit / timeout
+        |
+        v
+ hidden pytest grading -> terminal reward -> JSONL trajectory/report
 ```
-
-TaskForge targets Python 3.11+ and keeps runtime dependencies minimal:
-`pydantic v2`, `pyyaml`, and `typer`. Tests use `pytest`, and linting uses
-`ruff`.
 
 ## Task Format
 
-A task lives in `tasks/<task-id>/` and contains a `task.yaml`, a source
-`workspace/`, test files, and usually a reference `solution/`.
+A task lives in `tasks/<task-id>/`. The agent only receives `workspace/` and
+visible tests. Hidden tests and the optional reference `solution/` stay outside
+the normal episode.
 
 ```yaml
 id: fix-retry-backoff
 title: Fix retry final exception propagation
-description: The coding-agent-facing task description.
+description: Re-raise the final exception after all retry attempts fail.
 workspace: workspace
 solution: solution
 tests:
-  visible:
-    - tests/test_basic.py
-  hidden:
-    - tests/test_grading.py
+  visible: [tests/test_basic.py]
+  hidden: [tests/test_grading.py]
 reward:
   type: test_pass_ratio
   partial_credit: false
-budget:
-  step_timeout_s: 5
-  test_timeout_s: 10
 limits:
-  max_observation_chars: 4000
   max_steps: 25
+  max_observation_chars: 4000
 metadata:
   difficulty: easy
-  tags:
-    - swallowed-exception
-    - retry
-```
-
-Validation checks that referenced files exist, visible and hidden test lists do
-not overlap, the workspace directory exists, and `reward.type` is registered.
-The effective step budget is `--max-steps` when explicitly passed; otherwise it
-comes from the task's `limits.max_steps`.
-
-At runtime, TaskForge copies the workspace and visible tests into a temporary
-directory. Hidden tests are restored from the original task definition
-immediately before grading, so modifying hidden tests inside the temporary
-workspace does not affect the reward. The optional `solution/` directory is
-never copied into the normal agent workspace. It is used only by
-`taskforge verify` to prove the task is solvable.
-
-## Example
-
-The included `fix-retry-backoff` task contains a broken `retry()` helper. Visible
-tests cover only the happy path and pass before the fix. Hidden tests assert that
-the final exception is re-raised after all attempts fail, so the initial reward
-is `0.0`.
-
-Validate tasks:
-
-```bash
-taskforge validate tasks
-```
-
-Inspect a task:
-
-```bash
-taskforge inspect fix-retry-backoff
-```
-
-Run the scripted policy, which runs visible tests and then finishes:
-
-```bash
-taskforge run fix-retry-backoff --policy scripted
-```
-
-`taskforge run` always writes a trajectory. By default it uses
-`runs/<timestamp>/<task_id>-0.jsonl`; pass `--trajectory path/to/run.jsonl` to
-choose the file explicitly.
-
-Run framework tests:
-
-```bash
-python -m pytest
-python -m ruff check .
-```
-
-## Task QA
-
-Run task quality verification locally or in CI:
-
-```bash
-taskforge verify tasks/ --runner subprocess
-taskforge verify tasks/ --task fix-retry-backoff --runner subprocess
-```
-
-Verification checks:
-
-```text
-fails_initially     hidden tests fail on the pristine workspace
-solvable            applying solution/ makes hidden reward exactly 1.0
-visible_consistent  visible tests pass after applying solution/
-no_leakage          solution/ and hidden tests are absent from the initial workspace
-deterministic       grading the same workspace twice produces the same reward
+  tags: [swallowed-exception, retry]
 ```
 
 Authoring checklist:
 
-```text
-1. Keep the prompt solvable from workspace/ alone.
-2. Put only agent-visible starter files in workspace/.
-3. Put visible tests in tests/ and list them under tests.visible.
-4. Put grading-only tests in tests/ and list them under tests.hidden.
-5. Put the reference fix in solution/, using paths relative to workspace/.
-6. Ensure the starter workspace gets reward < 1.0.
-7. Ensure solution/ gets reward == 1.0 and passes visible tests.
-8. Add metadata.difficulty and metadata.tags for reporting.
-9. Run taskforge verify tasks/ before committing.
+1. The prompt is solvable from `workspace/` alone.
+2. Starter code fails hidden tests before any edit.
+3. Applying `solution/` makes hidden reward exactly `1.0`.
+4. Visible tests also pass with `solution/`.
+5. Hidden tests and solution files are absent from the initial workspace.
+6. `metadata.difficulty` and `metadata.tags` are set for reporting.
+
+## Results
+
+These numbers come from the checked-in `report.md`: random ran 30 episodes
+across the 10-task pack; Claude ran 3 episodes before `--max-cost-usd 0.10`
+stopped launching new work.
+
+| Policy | Episodes | pass@1 | pass@3 | Mean Reward | Mean Steps | Cost |
+|---|---:|---:|---:|---:|---:|---:|
+| random | 30 | 0.000 | 0.000 | 0.000 | 5.23 | $0.000000 |
+| claude | 3 | 1.000 | 1.000 | 1.000 | 7.00 | $0.170124 |
+
+Example artifacts are committed under `examples/`:
+
+- `examples/solved/fix-api-404-solved.jsonl` and `examples/solved/viewer.html`
+- `examples/failed/fix-retry-backoff-failed.jsonl` and `examples/failed/viewer.html`
+
+## Anti-Reward-Hacking
+
+TaskForge assumes agents will try weird things, so the environment is defensive:
+
+- Hidden tests are restored from the task source immediately before grading.
+- `ReadFile` and `WriteFile` resolve through workspace confinement and reject
+  `..`, escaped absolute paths, and symlinks that leave the workspace.
+- `taskforge verify` checks no hidden test or solution file leaks into the
+  initial workspace.
+- Observations use the stable placeholder `/workspace`; host temp paths are kept
+  internal and are not written to trajectories.
+- Failure analysis tracks `attempted_test_edit`; the current report observed 0
+  test-edit attempts.
+
+## Quickstart
+
+```bash
+python -m venv .venv
+.venv\Scripts\python -m pip install -e ".[dev]"
+
+.venv\Scripts\taskforge verify tasks --runner subprocess
+.venv\Scripts\taskforge run fix-retry-backoff --policy scripted --verbose-trajectory
+.venv\Scripts\taskforge eval --tasks tasks --policy random --n 3 --yes --out runs/random
+.venv\Scripts\taskforge report runs/random --out report.md
+.venv\Scripts\taskforge view examples/failed/fix-retry-backoff-failed.jsonl --out viewer.html
 ```
+
+Claude policy:
+
+```bash
+$env:ANTHROPIC_API_KEY = "..."
+.venv\Scripts\taskforge eval `
+  --tasks tasks `
+  --policy claude `
+  --n 3 `
+  --max-workers 2 `
+  --temperature 0.7 `
+  --yes `
+  --max-cost-usd 1.00 `
+  --out runs/claude
+```
+
+You can also put `ANTHROPIC_API_KEY=...` in a local `.env`; TaskForge loads it
+without logging or persisting the secret.
 
 ## Action Space
 
-Stage 2 adds a Pydantic discriminated union in `taskforge/actions.py`. Agents
-should send dictionaries with a `type` field and parse them through
-`parse_action(data)`.
-
-Supported actions:
+Agents emit Pydantic-validated actions:
 
 ```json
 {"type": "read_file", "path": "client.py"}
@@ -144,205 +133,42 @@ Supported actions:
 {"type": "finish"}
 ```
 
-`run_tests` only allows `scope: "visible"`. `scope: "hidden"` is rejected during
-action parsing because hidden tests are reserved for grading. `ReadFile` and
-`WriteFile` resolve paths through `resolve_in_workspace()`, which rejects `..`,
-absolute paths outside the workspace, and symlinks that resolve outside the
-workspace. Invalid filesystem actions, such as missing files or escaped paths,
-consume one step and return an error observation, but they do not end the episode.
-
-Observation text is truncated by `taskforge/truncation.py` using the task limit
-`limits.max_observation_chars`, which defaults to `4000`. `Observation.truncated`
-is set when any observation field was shortened. Every observation includes a
-`task_statement` containing the task title and description, so policies receive
-the prompt at reset and on every later step. `Observation.workspace` is always
-the stable placeholder `/workspace`; the real temporary host path stays internal
-and is not written to trajectories.
-
-## Runners
-
-`taskforge run` accepts:
-
-```bash
-taskforge run fix-retry-backoff --runner subprocess
-taskforge run fix-retry-backoff --runner docker
-```
-
-`DockerRunner` uses Docker CLI with `--network none`, `--memory 512m`,
-`--cpus 1`, a non-root user, a read-only container filesystem, and the workspace
-bind-mounted at `/workspace`. If Docker is not available, it raises a clear error
-telling you to use `--runner subprocess`.
+`run_tests` rejects `scope: "hidden"`. Invalid filesystem actions consume one
+step, increment `invalid_actions`, and return an error observation; genuine
+framework failures are the ones marked `done_reason="error"`.
 
 ## Trajectory Schema
 
-Versioned trajectories are JSONL files written by `taskforge/trajectory.py`.
-Every record has `schema_version: "1.0"`. Observations are stored by SHA-256
-digest, with an optional side file containing full observation payloads when
-`--verbose-trajectory` is used.
-
-Write a trajectory:
-
-```bash
-taskforge run fix-retry-backoff --trajectory run.jsonl --verbose-trajectory
-```
-
-Read, summarize, and replay:
-
-```bash
-taskforge stats run.jsonl
-taskforge replay run.jsonl
-```
-
-Record examples:
+Trajectories are JSONL with `schema_version: "1.0"`. Observations are stored as
+digests; `--verbose-trajectory` writes full observations to a side file next to
+that episode's trajectory.
 
 ```json
-{
-  "schema_version": "1.0",
-  "record_type": "episode_start",
-  "run_id": "7d6a...",
-  "task_id": "fix-retry-backoff",
-  "step": 0,
-  "observation": {
-    "digest": "sha256...",
-    "side_file": "run.jsonl.observations.jsonl",
-    "truncated": false
-  },
-  "metadata": {
-    "policy_name": "claude",
-    "seed": 0,
-    "temperature": 0.7
-  },
-  "ts": "2026-08-14T12:00:00+00:00"
-}
+{"schema_version":"1.0","record_type":"episode_start","task_id":"fix-api-404","step":0,"observation":{"digest":"...","side_file":"run.jsonl.observations.jsonl","truncated":false},"metadata":{"policy_name":"claude","seed":0,"temperature":0.7},"ts":"..."}
+{"schema_version":"1.0","record_type":"step","task_id":"fix-api-404","step":1,"action":{"type":"write_file","path":"api.py","content":"..."},"reward":0.0,"done":false,"done_reason":null,"observation":{"digest":"...","side_file":"run.jsonl.observations.jsonl","truncated":false},"invalid_actions":0,"cumulative_cost_usd":0.0,"ts":"..."}
+{"schema_version":"1.0","record_type":"episode_end","task_id":"fix-api-404","step":2,"terminal_reward":1.0,"done_reason":"finish","invalid_actions":0,"ts":"..."}
 ```
 
-## Policy Interface
+`taskforge replay <trajectory.jsonl>` re-executes recorded actions against a
+fresh workspace and checks the same terminal reward.
 
-Stage 3 adds policy-driven evaluation. A policy implements
-`taskforge.policies.base.Policy`:
-
-```python
-class Policy(Protocol):
-    name: str
-
-    def reset(self) -> None: ...
-    def act(self, obs: Observation) -> Action: ...
-    def stats(self) -> PolicyStats: ...
-```
-
-Built-in policies:
-
-```text
-scripted  runs visible tests once, then finishes
-random    seeded baseline that samples valid non-hidden actions
-claude    Anthropic-backed tool-using policy
-```
-
-The Claude policy reads `ANTHROPIC_API_KEY` from the environment, never logs or
-persists it, and generates tool schemas directly from the Pydantic action models.
-It keeps conversation state, retries transient API failures with exponential
-backoff, records token/latency/cost stats, and returns `Finish()` after repeated
-SDK failures or malformed model replies.
-
-## Evaluation
-
-Run a parallel evaluation:
+## Reporting And Viewing
 
 ```bash
-taskforge eval \
-  --tasks tasks/ \
-  --policy claude \
-  --n 3 \
-  --max-workers 4 \
-  --runner subprocess \
-  --out runs/eval-scripted/ \
-  --verbose-trajectory \
-  --max-steps 25 \
-  --temperature 0.7
+.venv\Scripts\taskforge report runs/random runs/claude --out report.md
+.venv\Scripts\taskforge view runs/random/fix-retry-backoff-0.jsonl --out viewer.html
 ```
 
-Omit `--max-steps` to use each task's own configured step budget.
+The Markdown report includes headline metrics, breakdowns by difficulty and
+task tag, per-task random-vs-Claude results, failure-tag distribution, and cost
+summary. The HTML viewer is a single self-contained file with inline CSS and JS;
+it opens directly from the filesystem.
 
-Use Claude:
+## Limitations
 
-```bash
-$env:ANTHROPIC_API_KEY = "..."
-taskforge eval --tasks tasks/ --policy claude --n 3 --max-workers 2 --yes --max-cost-usd 1.00
-```
-
-Alternatively, put the key in a local `.env` file:
-
-```dotenv
-ANTHROPIC_API_KEY=...
-```
-
-Before an eval starts, TaskForge prints the planned episode count and an
-estimated cost range. Runs above the confirmation threshold require `--yes`.
-`--max-cost-usd` stops launching new episodes once accumulated reported cost
-crosses the limit; already-running episodes are allowed to finish.
-
-Each episode receives its own workspace, policy instance, runner, and trajectory
-file. A failing episode is captured as `done_reason="error"` and does not abort
-the rest of the run.
-
-The output directory contains `report.json` and one trajectory JSONL per
-episode. With `--verbose-trajectory`, each episode also writes its full
-observations to a side file next to its trajectory, for example
-`fix-retry-backoff-0.jsonl.observations.jsonl`. Parallel runs use one side file
-per episode and do not share observation handles. The trajectory header records
-the policy name, seed, and policy temperature when present, so sampled runs can
-be interpreted later. Render a saved report with:
-
-```bash
-taskforge report runs/eval-scripted/
-```
-
-Report columns:
-
-```text
-TASK    task id
-SEED    per-episode seed
-REWARD  terminal reward
-STEPS   environment steps
-INVALID invalid action count
-DONE    done_reason, such as finish, step_limit, timeout, or error
-COST    policy-reported USD cost
-ERROR   captured episode error, if any
-```
-
-The summary includes mean reward, mean steps, total cost, and the done-reason
-distribution. `taskforge.metrics.pass_at_k(n, c, k)` provides the standard
-unbiased pass@k estimator for downstream reporting.
-
-```json
-{
-  "schema_version": "1.0",
-  "record_type": "step",
-  "run_id": "7d6a...",
-  "task_id": "fix-retry-backoff",
-  "step": 1,
-  "action": {"type": "run_tests", "scope": "visible"},
-  "reward": 0.0,
-  "done": false,
-  "done_reason": null,
-  "observation": {
-    "digest": "sha256...",
-    "side_file": "run.jsonl.observations.jsonl",
-    "truncated": false
-  },
-  "ts": "2026-08-14T12:00:01+00:00"
-}
-```
-
-```json
-{
-  "schema_version": "1.0",
-  "record_type": "episode_end",
-  "run_id": "7d6a...",
-  "task_id": "fix-retry-backoff",
-  "step": 2,
-  "terminal_reward": 0.0,
-  "done_reason": "finish",
-  "ts": "2026-08-14T12:00:02+00:00"
-}
-```
+- The task pack is intentionally small: 10 Python tasks, not a benchmark.
+- Claude numbers depend on model version, temperature, API availability, and
+  budget guardrails.
+- DockerRunner is implemented but not yet tested on Windows Docker Desktop.
+- Sandboxing is process/container level, not a full OS security boundary.
+- Failure classification is heuristic and trajectory-only by design.

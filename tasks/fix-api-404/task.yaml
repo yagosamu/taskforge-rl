@@ -1,7 +1,9 @@
 id: fix-api-404
 title: Return 404 for missing API records
 description: >
-  The API handler should return 404 when a requested record does not exist.
+  The API handler returns 200 with the record when it exists. When the
+  requested record does not exist, it must return status 404 and the body
+  {"error": "not found"}.
 workspace: workspace
 tests:
   visible:

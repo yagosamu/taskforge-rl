@@ -43,6 +43,7 @@ class RateLimitError(Exception):
 def _obs() -> Observation:
     return Observation(
         task_id="fix-retry-backoff",
+        task_statement="Fix retry final exception propagation\n\nFix the retry helper.",
         workspace=__import__("pathlib").Path("."),
         step=0,
         remaining_steps=3,

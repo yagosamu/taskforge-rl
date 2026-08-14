@@ -153,7 +153,9 @@ consume one step and return an error observation, but they do not end the episod
 
 Observation text is truncated by `taskforge/truncation.py` using the task limit
 `limits.max_observation_chars`, which defaults to `4000`. `Observation.truncated`
-is set when any observation field was shortened.
+is set when any observation field was shortened. Every observation includes a
+`task_statement` containing the task title and description, so policies receive
+the prompt at reset and on every later step.
 
 ## Runners
 

@@ -22,7 +22,10 @@ def test_full_episode_writes_well_formed_jsonl(tmp_path: Path) -> None:
         final = env.step(Finish())
 
     assert first.task_id == "fix-retry-backoff"
+    assert "Fix retry final exception propagation" in first.task_statement
+    assert "must re-raise the final exception" in first.task_statement
     assert visible.reward == 0.0
+    assert visible.observation.task_statement == first.task_statement
     assert final.done is True
     assert final.reward == 0.0
 
@@ -83,3 +86,14 @@ def test_invalid_action_counter_is_written_to_trajectory(tmp_path: Path) -> None
     assert step_records[0].invalid_actions == 1
     assert step_records[1].invalid_actions == 1
     assert end_record.invalid_actions == 1
+
+
+def test_reset_observation_includes_task_description() -> None:
+    """The first observation includes the task title and description for policies."""
+    task = load_task(Path("tasks/fix-retry-backoff"))
+
+    with TaskEnv(task) as env:
+        observation = env.reset()
+
+    assert task.title in observation.task_statement
+    assert "must re-raise the final exception" in observation.task_statement

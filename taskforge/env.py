@@ -24,6 +24,7 @@ class Observation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     task_id: str
+    task_statement: str
     workspace: Path
     step: int
     remaining_steps: int
@@ -247,16 +248,28 @@ class TaskEnv:
         assert self.workspace is not None
         max_chars = self.task.limits.max_observation_chars
         task_id, truncated_task = truncate(self.task.id, max_chars)
+        statement, truncated_statement = truncate(self._task_statement(), max_chars)
         workspace, truncated_workspace = truncate(str(self.workspace), max_chars)
         output, truncated_output = truncate(last_output, max_chars)
         return Observation(
             task_id=task_id,
+            task_statement=statement,
             workspace=Path(workspace),
             step=self.step_count,
             remaining_steps=max(self._max_steps() - self.step_count, 0),
             last_output=output,
-            truncated=truncated_task or truncated_workspace or truncated_output,
+            truncated=(
+                truncated_task
+                or truncated_statement
+                or truncated_workspace
+                or truncated_output
+            ),
         )
+
+    def _task_statement(self) -> str:
+        title = self.task.title.strip()
+        description = self.task.description.strip()
+        return f"{title}\n\n{description}" if description else title
 
     def _max_steps(self) -> int:
         if self.max_steps_override is not None:

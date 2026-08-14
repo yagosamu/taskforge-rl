@@ -43,3 +43,14 @@ def test_shipped_tasks_pass_verification() -> None:
         )
 
     assert failures == []
+
+
+def test_shipped_tasks_have_non_empty_descriptions() -> None:
+    """Every shipped task has a prompt description available to the agent."""
+    empty = [
+        task.id
+        for task in discover_tasks(Path("tasks"))
+        if not task.description.strip()
+    ]
+
+    assert empty == []

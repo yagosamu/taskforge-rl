@@ -18,10 +18,14 @@ def test_full_episode_writes_well_formed_jsonl(tmp_path: Path) -> None:
 
     with TaskEnv(task, event_log_path=event_log) as env:
         first = env.reset()
+        real_workspace = env.workspace
         visible = env.step(RunTests())
         final = env.step(Finish())
 
     assert first.task_id == "fix-retry-backoff"
+    assert first.workspace == "/workspace"
+    assert real_workspace is not None
+    assert str(real_workspace) not in first.model_dump_json()
     assert "Fix retry final exception propagation" in first.task_statement
     assert "must re-raise the final exception" in first.task_statement
     assert visible.reward == 0.0
@@ -37,6 +41,25 @@ def test_full_episode_writes_well_formed_jsonl(tmp_path: Path) -> None:
         assert event["task_id"] == "fix-retry-backoff"
         assert isinstance(event["step"], int)
         assert event["ts"]
+
+
+def test_verbose_trajectory_does_not_leak_host_workspace_path(tmp_path: Path) -> None:
+    """Verbose observation side files use the stable workspace placeholder."""
+    task = load_task(Path("tasks/fix-retry-backoff"))
+    trajectory = tmp_path / "trajectory.jsonl"
+
+    with TaskEnv(task, trajectory_path=trajectory, verbose_trajectory=True) as env:
+        observation = env.reset()
+        real_workspace = env.workspace
+        env.step(Finish())
+
+    assert observation.workspace == "/workspace"
+    assert real_workspace is not None
+    trajectory_text = trajectory.read_text(encoding="utf-8")
+    side_text = (tmp_path / "trajectory.jsonl.observations.jsonl").read_text(encoding="utf-8")
+    assert str(real_workspace) not in trajectory_text
+    assert str(real_workspace) not in side_text
+    assert "/workspace" in side_text.replace("\\/", "/")
 
 
 def test_reading_missing_file_continues_and_counts_invalid_action() -> None:

@@ -17,6 +17,8 @@ from taskforge.trajectory import TrajectoryWriter
 from taskforge.truncation import truncate
 from taskforge.workspace import ephemeral_workspace
 
+WORKSPACE_PLACEHOLDER = "/workspace"
+
 
 class Observation(BaseModel):
     """Environment observation returned after reset and step."""
@@ -25,7 +27,7 @@ class Observation(BaseModel):
 
     task_id: str
     task_statement: str
-    workspace: Path
+    workspace: str
     step: int
     remaining_steps: int
     last_output: str = ""
@@ -98,7 +100,7 @@ class TaskEnv:
                 metadata=self.trajectory_metadata,
             )
         obs = self._observation()
-        self._emit("reset", {"workspace": str(self.workspace)})
+        self._emit("reset", {"workspace": WORKSPACE_PLACEHOLDER})
         if self._trajectory is not None:
             self._trajectory.write_start(step=self.step_count, observation=obs)
         return obs
@@ -249,12 +251,12 @@ class TaskEnv:
         max_chars = self.task.limits.max_observation_chars
         task_id, truncated_task = truncate(self.task.id, max_chars)
         statement, truncated_statement = truncate(self._task_statement(), max_chars)
-        workspace, truncated_workspace = truncate(str(self.workspace), max_chars)
+        workspace, truncated_workspace = truncate(WORKSPACE_PLACEHOLDER, max_chars)
         output, truncated_output = truncate(last_output, max_chars)
         return Observation(
             task_id=task_id,
             task_statement=statement,
-            workspace=Path(workspace),
+            workspace=workspace,
             step=self.step_count,
             remaining_steps=max(self._max_steps() - self.step_count, 0),
             last_output=output,

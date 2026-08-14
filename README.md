@@ -155,7 +155,9 @@ Observation text is truncated by `taskforge/truncation.py` using the task limit
 `limits.max_observation_chars`, which defaults to `4000`. `Observation.truncated`
 is set when any observation field was shortened. Every observation includes a
 `task_statement` containing the task title and description, so policies receive
-the prompt at reset and on every later step.
+the prompt at reset and on every later step. `Observation.workspace` is always
+the stable placeholder `/workspace`; the real temporary host path stays internal
+and is not written to trajectories.
 
 ## Runners
 
